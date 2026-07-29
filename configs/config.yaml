@@ -1,0 +1,19 @@
+project:
+  name: intelligent-document-analysis
+  version: 0.1.0
+
+paths:
+  raw_data: data/raw
+  processed_data: data/processed
+  samples: data/samples
+  vectorstore: chroma_db
+
+embedding:
+  model_name: ""
+
+chunking:
+  chunk_size: 500
+  chunk_overlap: 50
+
+vectorstore:
+  collection_name: documents

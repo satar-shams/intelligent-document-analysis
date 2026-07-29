@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Data
+data/raw/*
+data/processed/*
+data/samples/*
+
+# Vector databases
+chroma_db/
+chroma_data/
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Models
+models/
+*.pkl
+*.pickle
+*.joblib
+*.pt
+*.pth
+*.onnx
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# Python packaging
+*.egg-info/
+dist/
+build/
