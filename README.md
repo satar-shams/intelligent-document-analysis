@@ -2,7 +2,7 @@
 
 A modular document processing pipeline for extracting, preprocessing, and structuring content from heterogeneous documents for semantic search, information extraction, and Retrieval-Augmented Generation (RAG).
 
-> **Status:** **Phase 2 Complete.** Document ingestion, OCR, text preprocessing, chunking, and unit tests have been implemented. The next milestone is semantic embedding generation and vector database integration.
+> **Status:** **Phase 3 Complete.** Document ingestion, OCR, text preprocessing, semantic embedding generation, and unit tests have been implemented. The next milestone is vector database integration with ChromaDB.
 
 ---
 
@@ -17,9 +17,10 @@ Current capabilities include:
 * OCR for scanned PDFs
 * Text cleaning and normalization
 * Configurable text chunking
+* Semantic embedding generation
 * Automated unit testing
 
-Future stages will introduce semantic embeddings, vector databases, information extraction, and Retrieval-Augmented Generation (RAG).
+Future stages will introduce vector databases, information extraction, and Retrieval-Augmented Generation (RAG).
 
 ---
 
@@ -110,19 +111,19 @@ intelligent-document-analysis/
 
 # Tech Stack
 
-| Layer            | Tools                             |
-| ---------------- | --------------------------------- |
-| Language         | Python 3.12                       |
-| PDF Processing   | PyMuPDF                           |
-| DOCX Processing  | python-docx                       |
-| OCR              | Tesseract OCR + pytesseract       |
-| Image Processing | Pillow                            |
-| Text Processing  | Regex                             |
-| Testing          | pytest                            |
-| Configuration    | YAML                              |
-| Vector Database  | ChromaDB *(planned)*              |
-| Embeddings       | Sentence Transformers *(planned)* |
-| Containerization | Docker                            |
+| Layer | Tools |
+|-------|-------|
+| Language | Python 3.12 |
+| PDF Processing | PyMuPDF |
+| DOCX Processing | python-docx |
+| OCR | Tesseract OCR + pytesseract |
+| Image Processing | Pillow |
+| Text Processing | Regex |
+| Embeddings | Sentence Transformers + PyTorch |
+| Testing | pytest |
+| Configuration | YAML |
+| Vector Database | ChromaDB *(planned)* |
+| Containerization | Docker |
 
 ---
 
@@ -217,6 +218,40 @@ Chunk structure:
 
 ---
 
+# Embedding Generation
+
+Document chunks are converted into dense semantic vectors using **Sentence Transformers**.
+
+Current model:
+
+* `all-MiniLM-L6-v2`
+
+The embedding pipeline provides:
+
+* Input validation
+* Dependency injection for testing
+* One embedding per text chunk
+* Python list output compatible with vector databases
+
+Example:
+
+```python
+from src.embeddings.embedding_pipeline import EmbeddingPipeline
+
+pipeline = EmbeddingPipeline(
+    model_name="all-MiniLM-L6-v2",
+)
+
+embeddings = pipeline.embed(
+    [
+        "Machine learning is fun.",
+        "Artificial intelligence is changing software."
+    ]
+)
+```
+
+---
+
 # Testing
 
 Run all tests:
@@ -237,9 +272,17 @@ Run preprocessing tests:
 python -m pytest tests/test_preprocessing.py
 ```
 
+Run embedding tests:
+
+```bash
+python -m pytest tests/test_embeddings.py
+```
+
 Current status:
 
-* ✅ 13 / 13 tests passing
+* ✅ Ingestion tests passing
+* ✅ Preprocessing tests passing
+* ✅ Embedding tests passing
 
 ---
 
@@ -269,7 +312,7 @@ configs/
 └── config.yaml
 ```
 
-Shared settings such as chunk size, overlap, embedding models, and vector database configuration will be managed from this file as the project grows.
+Shared settings such as chunk size, overlap, embedding model, and future vector database configuration are managed from this file.
 
 ---
 
@@ -281,28 +324,28 @@ The project follows several engineering principles:
 * **Reusability** — configurable processing functions.
 * **Testability** — automated unit tests.
 * **Separation of Concerns** — parsing, preprocessing, embeddings, storage, and retrieval remain independent.
-* **Local-first Development** — no external AI APIs are required.
+* **Local-first Development** — pretrained models run locally after the initial download.
 * **Incremental Development** — components are added only when needed.
 
 ---
 
 # Current Implementation Status
 
-| Component              | Status |
-| ---------------------- | :----: |
-| Project Structure      |    ✅   |
-| PDF Parser             |    ✅   |
-| DOCX Parser            |    ✅   |
-| OCR Engine             |    ✅   |
-| OCR JSON Export        |    ✅   |
-| Text Cleaning          |    ✅   |
-| Text Chunking          |    ✅   |
-| Unit Tests             |    ✅   |
-| Embedding Pipeline     |   🚧   |
-| Vector Database        |   🚧   |
-| Information Extraction |   🚧   |
-| RAG Pipeline           |   🚧   |
-| Monitoring             |   🚧   |
+| Component | Status |
+|------------------------|:------:|
+| Project Structure | ✅ |
+| PDF Parser | ✅ |
+| DOCX Parser | ✅ |
+| OCR Engine | ✅ |
+| OCR JSON Export | ✅ |
+| Text Cleaning | ✅ |
+| Text Chunking | ✅ |
+| Embedding Pipeline | ✅ |
+| Unit Tests | ✅ |
+| Vector Database | 🚧 |
+| Information Extraction | 🚧 |
+| RAG Pipeline | 🚧 |
+| Monitoring | 🚧 |
 
 ---
 
@@ -320,18 +363,24 @@ The project follows several engineering principles:
 * Chunking
 * Unit tests
 
-## 🚧 Phase 3 — Semantic Search
+## ✅ Phase 3 — Semantic Embeddings
 
-* Sentence Transformer embeddings
+* Sentence Transformer integration
+* Embedding pipeline
+* Embedding unit tests
+
+## 🚧 Phase 4 — Vector Database
+
 * ChromaDB integration
 * Similarity search
+* Metadata storage
 
-## 🚧 Phase 4 — Information Extraction
+## 🚧 Phase 5 — Information Extraction
 
 * Named Entity Recognition
 * Document classification
 
-## 🚧 Phase 5 — Retrieval-Augmented Generation
+## 🚧 Phase 6 — Retrieval-Augmented Generation
 
 * Retriever
 * Prompt templates
