@@ -2,7 +2,7 @@
 
 A modular document processing pipeline for extracting, preprocessing, and structuring content from heterogeneous documents for semantic search, information extraction, and Retrieval-Augmented Generation (RAG).
 
-> **Status:** **Phase 3 Complete.** Document ingestion, OCR, text preprocessing, semantic embedding generation, and unit tests have been implemented. The next milestone is vector database integration with ChromaDB.
+> **Status:** **Phase 4 Complete.** Document ingestion, OCR, text preprocessing, semantic embedding generation, vector database integration, semantic search, and unit tests have been implemented. The next milestone is document retrieval for Retrieval-Augmented Generation (RAG).
 
 ---
 
@@ -12,15 +12,17 @@ This project provides a modular pipeline for processing documents in multiple fo
 
 Current capabilities include:
 
-* PDF text extraction
-* DOCX text extraction
-* OCR for scanned PDFs
-* Text cleaning and normalization
-* Configurable text chunking
-* Semantic embedding generation
-* Automated unit testing
+- PDF text extraction
+- DOCX text extraction
+- OCR for scanned PDFs
+- Text cleaning and normalization
+- Configurable text chunking
+- Semantic embedding generation
+- ChromaDB vector storage
+- Semantic similarity search
+- Automated unit testing
 
-Future stages will introduce vector databases, information extraction, and Retrieval-Augmented Generation (RAG).
+Future stages will introduce document retrieval, information extraction, and Retrieval-Augmented Generation (RAG).
 
 ---
 
@@ -51,7 +53,10 @@ Future stages will introduce vector databases, information extraction, and Retri
                     Embeddings
                           │
                           ▼
-                    Vector Store
+                    ChromaDB
+                          │
+                          ▼
+                  Semantic Search
                           │
                           ▼
                  Retrieval / RAG
@@ -66,41 +71,21 @@ intelligent-document-analysis/
 ├── README.md
 ├── requirements.txt
 ├── requirements-dev.txt
-├── .env.example
 ├── .gitignore
 │
 ├── configs/
 │   └── config.yaml
 │
-├── docker/
-│   └── Dockerfile
-│
 ├── src/
 │   ├── ingestion/
-│   │   ├── pdf_parser.py
-│   │   ├── docx_parser.py
-│   │   └── ocr_engine.py
-│   │
 │   ├── preprocessing/
-│   │   ├── cleaner.py
-│   │   └── chunker.py
-│   │
 │   ├── embeddings/
 │   │   └── embedding_pipeline.py
-│   │
 │   ├── vectorstore/
 │   │   └── chroma_store.py
-│   │
-│   ├── extraction/
-│   │   ├── classifier.py
-│   │   └── ner_model.py
-│   │
 │   ├── rag/
-│   │   ├── rag_chain.py
-│   │   └── prompt_templates.py
-│   │
+│   ├── extraction/
 │   └── monitoring/
-│       └── metrics.py
 │
 ├── tests/
 ├── notebooks/
@@ -120,9 +105,9 @@ intelligent-document-analysis/
 | Image Processing | Pillow |
 | Text Processing | Regex |
 | Embeddings | Sentence Transformers + PyTorch |
+| Vector Database | ChromaDB |
 | Testing | pytest |
 | Configuration | YAML |
-| Vector Database | ChromaDB *(planned)* |
 | Containerization | Docker |
 
 ---
@@ -142,13 +127,13 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Install Tesseract on Ubuntu:
+Install Tesseract (Ubuntu):
 
 ```bash
 sudo apt install tesseract-ocr
 ```
 
-Verify the installation:
+Verify:
 
 ```bash
 tesseract --version
@@ -158,13 +143,11 @@ tesseract --version
 
 # Document Ingestion
 
-The ingestion layer provides reusable parsers for different document types.
+Supported document formats:
 
-Supported inputs:
-
-* PDF documents
-* DOCX documents
-* Scanned PDFs using OCR
+- PDF
+- DOCX
+- Scanned PDF (OCR)
 
 Example:
 
@@ -187,26 +170,21 @@ pages = extract_ocr_text(
 )
 ```
 
-OCR results can optionally be saved as structured JSON for downstream processing.
-
 ---
 
 # Text Preprocessing
 
-After extraction, documents are normalized before semantic processing.
+Current preprocessing features:
 
-Current functionality:
+- Normalize whitespace
+- Normalize line endings
+- Remove excessive blank lines
+- Page-wise cleaning
+- Configurable chunk size
+- Configurable overlap
+- Metadata preservation
 
-* Normalize line endings
-* Normalize whitespace
-* Remove excessive blank lines
-* Page-wise cleaning
-* Configurable chunk size
-* Configurable chunk overlap
-* Sequential chunk IDs
-* Metadata preservation
-
-Chunk structure:
+Example chunk:
 
 ```python
 {
@@ -220,18 +198,18 @@ Chunk structure:
 
 # Embedding Generation
 
-Document chunks are converted into dense semantic vectors using **Sentence Transformers**.
+Document chunks are converted into dense semantic vectors using Sentence Transformers.
 
 Current model:
 
-* `all-MiniLM-L6-v2`
+- `all-MiniLM-L6-v2`
 
-The embedding pipeline provides:
+Features:
 
-* Input validation
-* Dependency injection for testing
-* One embedding per text chunk
-* Python list output compatible with vector databases
+- Configurable embedding model
+- Dependency injection for testing
+- Input validation
+- Compatible with ChromaDB
 
 Example:
 
@@ -244,9 +222,41 @@ pipeline = EmbeddingPipeline(
 
 embeddings = pipeline.embed(
     [
-        "Machine learning is fun.",
-        "Artificial intelligence is changing software."
+        "Machine learning",
+        "Artificial intelligence",
     ]
+)
+```
+
+---
+
+# Vector Database
+
+Embeddings are stored locally using ChromaDB.
+
+Features:
+
+- Persistent vector database
+- Automatic collection creation
+- Metadata storage
+- Semantic similarity search
+- Collection management
+
+Example:
+
+```python
+from src.vectorstore.chroma_store import ChromaStore
+
+store = ChromaStore()
+
+store.add(
+    chunks=chunks,
+    embeddings=embeddings,
+)
+
+results = store.search(
+    query_embedding,
+    top_k=5,
 )
 ```
 
@@ -260,46 +270,21 @@ Run all tests:
 python -m pytest
 ```
 
-Run ingestion tests:
+Run specific suites:
 
 ```bash
 python -m pytest tests/test_ingestion.py
-```
-
-Run preprocessing tests:
-
-```bash
 python -m pytest tests/test_preprocessing.py
-```
-
-Run embedding tests:
-
-```bash
 python -m pytest tests/test_embeddings.py
+python -m pytest tests/test_vectorstore.py
 ```
 
 Current status:
 
-* ✅ Ingestion tests passing
-* ✅ Preprocessing tests passing
-* ✅ Embedding tests passing
-
----
-
-# Data Organization
-
-```text
-data/
-├── raw/
-│   ├── pdf/
-│   ├── docx/
-│   └── images/
-│
-├── processed/
-└── samples/
-```
-
-Raw documents remain separate from generated outputs throughout the pipeline.
+- ✅ Ingestion tests
+- ✅ Preprocessing tests
+- ✅ Embedding tests
+- ✅ Vector database tests
 
 ---
 
@@ -312,20 +297,28 @@ configs/
 └── config.yaml
 ```
 
-Shared settings such as chunk size, overlap, embedding model, and future vector database configuration are managed from this file.
+Configuration currently includes:
+
+- Project metadata
+- Data paths
+- Embedding model
+- Chunk size
+- Chunk overlap
+- ChromaDB path
+- Collection name
 
 ---
 
 # Development Principles
 
-The project follows several engineering principles:
+The project follows these engineering principles:
 
-* **Modularity** — independent pipeline components.
-* **Reusability** — configurable processing functions.
-* **Testability** — automated unit tests.
-* **Separation of Concerns** — parsing, preprocessing, embeddings, storage, and retrieval remain independent.
-* **Local-first Development** — pretrained models run locally after the initial download.
-* **Incremental Development** — components are added only when needed.
+- **Modularity**
+- **Reusability**
+- **Testability**
+- **Separation of Concerns**
+- **Local-first Development**
+- **Incremental Development**
 
 ---
 
@@ -341,50 +334,47 @@ The project follows several engineering principles:
 | Text Cleaning | ✅ |
 | Text Chunking | ✅ |
 | Embedding Pipeline | ✅ |
+| Vector Database | ✅ |
+| Semantic Search | ✅ |
 | Unit Tests | ✅ |
-| Vector Database | 🚧 |
 | Information Extraction | 🚧 |
 | RAG Pipeline | 🚧 |
 | Monitoring | 🚧 |
 
 ---
-
 # Roadmap
 
 ## ✅ Phase 1 — Document Ingestion
 
-* PDF parsing
-* DOCX parsing
-* OCR extraction
+- PDF parsing
+- DOCX parsing
+- OCR extraction
 
 ## ✅ Phase 2 — Text Preprocessing
 
-* Text cleaning
-* Chunking
-* Unit tests
+- Text cleaning
+- Chunking
+- Unit tests
 
 ## ✅ Phase 3 — Semantic Embeddings
 
-* Sentence Transformer integration
-* Embedding pipeline
-* Embedding unit tests
+- Sentence Transformer integration
+- Embedding pipeline
+- Embedding unit tests
 
-## 🚧 Phase 4 — Vector Database
+## ✅ Phase 4 — Vector Database
 
-* ChromaDB integration
-* Similarity search
-* Metadata storage
+- ChromaDB integration
+- Embedding storage
+- Metadata storage
+- Semantic similarity search
 
-## 🚧 Phase 5 — Information Extraction
+## 🚧 Phase 5 — Information Retrieval
 
-* Named Entity Recognition
-* Document classification
-
-## 🚧 Phase 6 — Retrieval-Augmented Generation
-
-* Retriever
-* Prompt templates
-* RAG pipeline
+- Retriever
+- Context builder
+- Retrieval tests
+- Retrieval-ready pipeline
 
 ---
 

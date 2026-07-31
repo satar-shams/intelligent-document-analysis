@@ -6,7 +6,6 @@ paths:
   raw_data: data/raw
   processed_data: data/processed
   samples: data/samples
-  vectorstore: chroma_db
 
 embedding:
   model_name: all-MiniLM-L6-v2
@@ -16,4 +15,5 @@ chunking:
   chunk_overlap: 50
 
 vectorstore:
+  db_path: data/vectorstore
   collection_name: documents

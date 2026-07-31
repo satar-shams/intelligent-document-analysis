@@ -1,6 +1,5 @@
 from sentence_transformers import SentenceTransformer
 
-
 class EmbeddingPipeline:
 
     def __init__(
