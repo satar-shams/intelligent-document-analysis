@@ -1,14 +1,14 @@
 # intelligent-document-analysis
 
-A modular document processing pipeline for extracting, preprocessing, and structuring content from heterogeneous documents for semantic search, information extraction, and Retrieval-Augmented Generation (RAG).
+A modular document processing pipeline for extracting, preprocessing, embedding, and storing heterogeneous documents for semantic retrieval and future Retrieval-Augmented Generation (RAG) workflows.
 
-> **Status:** **Phase 4 Complete.** Document ingestion, OCR, text preprocessing, semantic embedding generation, vector database integration, semantic search, and unit tests have been implemented. The next milestone is document retrieval for Retrieval-Augmented Generation (RAG).
+> **Status:** **Task 1 Complete.** Document ingestion, OCR, text preprocessing, semantic embedding generation, ChromaDB vector database integration, semantic search, retrieval pipeline, and automated unit testing have been implemented.
 
 ---
 
 # Overview
 
-This project provides a modular pipeline for processing documents in multiple formats and preparing them for downstream NLP applications.
+This project provides a modular pipeline for processing documents in multiple formats and preparing them for semantic search and retrieval applications.
 
 Current capabilities include:
 
@@ -17,12 +17,14 @@ Current capabilities include:
 - OCR for scanned PDFs
 - Text cleaning and normalization
 - Configurable text chunking
+- Metadata preservation
 - Semantic embedding generation
 - ChromaDB vector storage
 - Semantic similarity search
+- Document retrieval pipeline
 - Automated unit testing
 
-Future stages will introduce document retrieval, information extraction, and Retrieval-Augmented Generation (RAG).
+Future improvements may introduce advanced information extraction and full Retrieval-Augmented Generation (RAG) workflows with LLM integration.
 
 ---
 
@@ -59,7 +61,10 @@ Future stages will introduce document retrieval, information extraction, and Ret
                   Semantic Search
                           │
                           ▼
-                 Retrieval / RAG
+                Retrieval Pipeline
+                          │
+                          ▼
+               Context Preparation
 ```
 
 ---
@@ -84,6 +89,8 @@ intelligent-document-analysis/
 │   ├── vectorstore/
 │   │   └── chroma_store.py
 │   ├── rag/
+│   │   ├── rag_chain.py
+│   │   └── prompt_templates.py
 │   ├── extraction/
 │   └── monitoring/
 │
@@ -147,7 +154,7 @@ Supported document formats:
 
 - PDF
 - DOCX
-- Scanned PDF (OCR)
+- Scanned PDF using OCR
 
 Example:
 
@@ -209,7 +216,7 @@ Features:
 - Configurable embedding model
 - Dependency injection for testing
 - Input validation
-- Compatible with ChromaDB
+- ChromaDB-compatible vector output
 
 Example:
 
@@ -237,10 +244,10 @@ Embeddings are stored locally using ChromaDB.
 Features:
 
 - Persistent vector database
-- Automatic collection creation
-- Metadata storage
-- Semantic similarity search
 - Collection management
+- Metadata storage
+- Vector insertion
+- Semantic similarity search
 
 Example:
 
@@ -262,6 +269,37 @@ results = store.search(
 
 ---
 
+# Retrieval Pipeline
+
+The retrieval layer connects user queries with the vector database.
+
+Flow:
+
+```text
+User Query
+     │
+     ▼
+Query Embedding
+     │
+     ▼
+ChromaDB Similarity Search
+     │
+     ▼
+Relevant Document Chunks
+     │
+     ▼
+Context Building
+```
+
+Implemented features:
+
+- Query embedding generation
+- Similarity-based retrieval
+- Top-k result selection
+- Context preparation for future LLM integration
+
+---
+
 # Testing
 
 Run all tests:
@@ -277,14 +315,17 @@ python -m pytest tests/test_ingestion.py
 python -m pytest tests/test_preprocessing.py
 python -m pytest tests/test_embeddings.py
 python -m pytest tests/test_vectorstore.py
+python -m pytest tests/test_rag_chain.py
 ```
 
 Current status:
 
+- ✅ 38 tests passing
 - ✅ Ingestion tests
 - ✅ Preprocessing tests
 - ✅ Embedding tests
 - ✅ Vector database tests
+- ✅ Retrieval pipeline tests
 
 ---
 
@@ -297,7 +338,7 @@ configs/
 └── config.yaml
 ```
 
-Configuration currently includes:
+Configuration includes:
 
 - Project metadata
 - Data paths
@@ -313,12 +354,12 @@ Configuration currently includes:
 
 The project follows these engineering principles:
 
-- **Modularity**
-- **Reusability**
-- **Testability**
-- **Separation of Concerns**
-- **Local-first Development**
-- **Incremental Development**
+- **Modularity** — independent pipeline components
+- **Reusability** — configurable processing modules
+- **Testability** — automated validation
+- **Separation of Concerns** — ingestion, preprocessing, embeddings, storage, and retrieval remain independent
+- **Local-first Development** — models run locally after download
+- **Incremental Development** — components are introduced step-by-step
 
 ---
 
@@ -333,15 +374,18 @@ The project follows these engineering principles:
 | OCR JSON Export | ✅ |
 | Text Cleaning | ✅ |
 | Text Chunking | ✅ |
+| Metadata Handling | ✅ |
 | Embedding Pipeline | ✅ |
 | Vector Database | ✅ |
 | Semantic Search | ✅ |
+| Retrieval Pipeline | ✅ |
 | Unit Tests | ✅ |
 | Information Extraction | 🚧 |
-| RAG Pipeline | 🚧 |
+| Full RAG Pipeline | 🚧 |
 | Monitoring | 🚧 |
 
 ---
+
 # Roadmap
 
 ## ✅ Phase 1 — Document Ingestion
@@ -353,6 +397,7 @@ The project follows these engineering principles:
 ## ✅ Phase 2 — Text Preprocessing
 
 - Text cleaning
+- Normalization
 - Chunking
 - Unit tests
 
@@ -360,7 +405,7 @@ The project follows these engineering principles:
 
 - Sentence Transformer integration
 - Embedding pipeline
-- Embedding unit tests
+- Embedding validation
 
 ## ✅ Phase 4 — Vector Database
 
@@ -369,12 +414,26 @@ The project follows these engineering principles:
 - Metadata storage
 - Semantic similarity search
 
-## 🚧 Phase 5 — Information Retrieval
+## ✅ Phase 5 — Information Retrieval
 
-- Retriever
+- Query embedding
+- Retriever pipeline
 - Context builder
 - Retrieval tests
-- Retrieval-ready pipeline
+
+---
+
+# Future Improvements
+
+Possible future enhancements:
+
+- Advanced OCR denoising
+- Header/footer removal
+- Improved metadata schema
+- Semantic chunking
+- Document hierarchy preservation
+- Full RAG pipeline with LLM integration
+- Monitoring and evaluation metrics
 
 ---
 
