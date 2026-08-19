@@ -36,6 +36,21 @@ def _get_config_value(
         ) from exc
 
 
+def _get_nested_config_value(
+    section: str,
+    subsection: str,
+    key: str,
+):
+    try:
+        return CONFIG[section][subsection][key]
+
+    except KeyError as exc:
+        raise KeyError(
+            f"Missing configuration: "
+            f"{section}.{subsection}.{key}"
+        ) from exc
+
+
 PROJECT_NAME = _get_config_value(
     "project",
     "name",
@@ -59,6 +74,41 @@ PROCESSED_DATA_PATH = _get_config_value(
 SAMPLES_PATH = _get_config_value(
     "paths",
     "samples",
+)
+
+INGESTION_INPUT_DIRECTORY = _get_config_value(
+    "ingestion",
+    "input_directory",
+)
+
+PDF_TEST_FILE = _get_nested_config_value(
+    "ingestion",
+    "test_files",
+    "pdf",
+)
+
+DOCX_TEST_FILE = _get_nested_config_value(
+    "ingestion",
+    "test_files",
+    "docx",
+)
+
+OCR_TEST_FILE = _get_nested_config_value(
+    "ingestion",
+    "test_files",
+    "ocr",
+)
+
+OCR_START_PAGE = _get_nested_config_value(
+    "ingestion",
+    "ocr",
+    "start_page",
+)
+
+OCR_END_PAGE = _get_nested_config_value(
+    "ingestion",
+    "ocr",
+    "end_page",
 )
 
 EMBEDDING_MODEL_NAME = _get_config_value(

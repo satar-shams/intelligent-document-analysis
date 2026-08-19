@@ -1,74 +1,120 @@
 import io
-import json 
 from pathlib import Path
 
 import fitz
 import pytesseract
 from PIL import Image
 
+from src.schemas import Document, Page
 
-def extract_ocr_text(
-    pdf_path: str | Path,
-    max_pages: int | None = None,
-) -> list[dict[str, str | int]]:
-    """
-    Extract text from a scanned PDF using Tesseract OCR.
 
-    Each PDF page is rendered at 300 DPI and passed to Tesseract
-    for text recognition.
+class OCRExtractor:
 
-    Args:
-        pdf_path: Path to the PDF file.
-        max_pages: Maximum number of pages to process.
-            If None, all pages are processed.
+    def can_process(self, document: Path) -> bool:
+        return document.suffix.lower() in {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".tiff",
+        }
 
-    Returns:
-        A list of dictionaries containing the page number and
-        extracted OCR text.
-    """
-    pdf_path = Path(pdf_path)
-    pages = []
+    def extract(
+        self,
+        document: Path,
+        start_page: int = 1,
+        end_page: int | None = None,
+    ) -> Document:
+        pages: list[Page] = []
 
-    with fitz.open(pdf_path) as document:
-        for page_number, page in enumerate(document, start=1):
-            if max_pages is not None and page_number > max_pages:
-                break
-
-            pixmap = page.get_pixmap(
-                dpi=300,
-                colorspace=fitz.csRGB,
+        if start_page < 1:
+            raise ValueError(
+                "start_page must be greater than or equal to 1."
             )
 
-            image = Image.open(
-                io.BytesIO(pixmap.tobytes("png"))
+        if end_page is not None and end_page < start_page:
+            raise ValueError(
+                "end_page must be greater than or equal to start_page."
             )
 
-            text = pytesseract.image_to_string(image)
+        with fitz.open(document) as ocr_document:
 
-            pages.append(
-                {
-                    "page_number": page_number,
-                    "text": text.strip(),
-                }
-            )
+            total_pages = len(ocr_document)
 
-    return pages
+            if start_page > total_pages:
+                raise ValueError(
+                    f"start_page ({start_page}) exceeds the document "
+                    f"length ({total_pages} pages)."
+                )
+
+            if end_page is None:
+                end_page = total_pages
+
+            if end_page > total_pages:
+                raise ValueError(
+                    f"end_page ({end_page}) exceeds the document "
+                    f"length ({total_pages} pages)."
+                )
+
+            for page_number in range(
+                start_page,
+                end_page + 1,
+            ):
+                page = ocr_document.load_page(page_number - 1)
+
+                pixmap = page.get_pixmap(
+                    dpi=300,
+                    colorspace=fitz.csRGB,
+                )
+
+                image = Image.open(
+                    io.BytesIO(
+                        pixmap.tobytes("png")
+                    )
+                )
+
+                text = pytesseract.image_to_string(image)
+
+                pages.append(
+                    Page(
+                        page_number=page_number,
+                        raw_text=text.strip(),
+                        extraction_method="ocr",
+                    )
+                )
+
+        return Document(
+            document_id=document.stem,
+            source_path=str(document),
+            file_type=document.suffix.lower().lstrip("."),
+            pages=pages,
+            metadata={},
+        )
 
 
-def save_ocr_results(
-    pages: list[dict[str, str | int]],
-    output_path: str | Path,
-) -> None:
-    """
-    Save OCR results to a JSON file.
+if __name__ == "__main__":
+    import json
+    from dataclasses import asdict
 
-    Args:
-        pages: OCR results containing page numbers and extracted text.
-        output_path: Path where the JSON file will be saved.
-    """
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    from src.config import OCR_TEST_FILE
 
-    with output_path.open("w", encoding="utf-8") as file:
-        json.dump(pages, file, ensure_ascii=False, indent=2)
+    ocr_test_file = Path(OCR_TEST_FILE)
 
+    ocr_extractor = OCRExtractor()
+
+    result = ocr_extractor.extract(
+        document=ocr_test_file,
+        start_page=20,
+        end_page=30,
+    )
+
+    print(f"\n{'=' * 60}")
+    print("COMPLETE DOCUMENT")
+    print(f"{'=' * 60}")
+
+    print(
+        json.dumps(
+            asdict(result),
+            indent=2,
+            ensure_ascii=False,
+        )
+    )

@@ -1,19 +1,29 @@
+from dataclasses import dataclass
 from typing import TypedDict
 
 
-class PageData(TypedDict):
-    page: int
+@dataclass
+class Page:
+    page_number: int
+    raw_text: str
+    cleaned_text: str | None = None
+    extraction_method: str | None = None
+
+
+@dataclass
+class Document:
+    document_id: str
+    source_path: str
+    file_type: str
+    pages: list[Page]
+    metadata: dict
+
+
+@dataclass
+class Chunk:
+    chunk_id: str
+    document_id: str
     text: str
-
-
-class ChunkData(TypedDict):
-    chunk_id: int
-    page: int
-    text: str
-
-
-class SearchResultData(TypedDict):
-    chunk_id: int
-    page: int
-    text: str
-    distance: float
+    page_start: int
+    page_end: int
+    section_title: str | None = None
