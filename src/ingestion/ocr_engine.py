@@ -103,8 +103,8 @@ if __name__ == "__main__":
 
     result = ocr_extractor.extract(
         document=ocr_test_file,
-        start_page=20,
-        end_page=30,
+        # start_page=20,
+        # end_page=30,
     )
 
     print(f"\n{'=' * 60}")
