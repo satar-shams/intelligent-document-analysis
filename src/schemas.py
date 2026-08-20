@@ -27,3 +27,13 @@ class Chunk:
     page_start: int
     page_end: int
     section_title: str | None = None
+@dataclass
+class SearchResultData:
+
+    chunk_id: str
+    document_id: str
+    text: str
+    page_start: int
+    page_end: int
+    distance: float
+    section_title: str | None = None

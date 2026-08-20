@@ -26,6 +26,9 @@ chunking:
   chunk_size: 500
   chunk_overlap: 50
 
+output:
+  max_text_preview_length: 200
+
 vectorstore:
   db_path: data/vectorstore
   collection_name: documents

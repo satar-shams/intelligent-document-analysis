@@ -5,7 +5,7 @@ from src.config import (
     VECTOR_DB_PATH,
 )
 from src.schemas import (
-    ChunkData,
+    Chunk,
     SearchResultData,
 )
 
@@ -26,7 +26,7 @@ class ChromaStore:
 
     def add(
         self,
-        chunks: list[ChunkData],
+        chunks: list[Chunk],
         embeddings: list[list[float]],
     ) -> None:
         """
@@ -43,14 +43,19 @@ class ChromaStore:
 
         ids: list[str] = []
         documents: list[str] = []
-        metadatas: list[dict[str, int]] = []
+        metadatas: list[dict] = []
 
         for chunk in chunks:
-            ids.append(str(chunk["chunk_id"]))
-            documents.append(chunk["text"])
+            ids.append(chunk.chunk_id)
+
+            documents.append(chunk.text)
+
             metadatas.append(
                 {
-                    "page": chunk["page"],
+                    "document_id": chunk.document_id,
+                    "page_start": chunk.page_start,
+                    "page_end": chunk.page_end,
+                    "section_title": chunk.section_title or "",
                 }
             )
 
@@ -83,19 +88,26 @@ class ChromaStore:
 
         search_results: list[SearchResultData] = []
 
-        for chunk_id, document, metadata, distance in zip(
+        for (
+            chunk_id,
+            text,
+            metadata,
+            distance,
+        ) in zip(
             results["ids"][0],
             results["documents"][0],
             results["metadatas"][0],
             results["distances"][0],
         ):
             search_results.append(
-                {
-                    "chunk_id": int(chunk_id),
-                    "page": metadata["page"],
-                    "text": document,
-                    "distance": float(distance),
-                }
+                SearchResultData(
+                    chunk_id=chunk_id,
+                    document_id=metadata["document_id"],
+                    text=text,
+                    page_start=metadata["page_start"],
+                    page_end=metadata["page_end"],
+                    distance=float(distance),
+                )
             )
 
         return search_results

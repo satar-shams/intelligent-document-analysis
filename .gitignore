@@ -58,3 +58,6 @@ build/
 
 # ChromaDB vector database
 data/vectorstore/
+
+# readme draft
+README.draft.md

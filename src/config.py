@@ -126,6 +126,11 @@ CHUNK_OVERLAP = _get_config_value(
     "chunk_overlap",
 )
 
+MAX_TEXT_PREVIEW_LENGTH = _get_config_value(
+    "output",
+    "max_text_preview_length",
+)
+
 VECTOR_DB_PATH = _get_config_value(
     "vectorstore",
     "db_path",
