@@ -77,42 +77,76 @@ The pipeline currently clears and recreates the configured ChromaDB collection b
 
 ```text
 intelligent-document-analysis/
-├── README.md
-├── .gitignore
-├── requirements.txt
-├── requirements-dev.txt
-│
 ├── configs/
 │   └── config.yaml
 │
-├── data/
-│   └── raw/
+├── docker/
+│   └── Dockerfile
+│
+├── reports/
+│   ├── phase1_report.md
+│   ├── phase2_report.md
+│   ├── phase3_report.md
+│   └── phase4_report.md
 │
 ├── src/
 │   ├── config.py
 │   ├── schemas.py
-│   │
-│   ├── ingestion/
-│   │   ├── extractor_manager.py
-│   │   ├── pdf_parser.py
-│   │   ├── docx_parser.py
-│   │   └── ocr_engine.py
-│   │
-│   ├── preprocessing/
-│   │   └── preprocessing_manager.py
+│   ├── types.py
 │   │
 │   ├── embeddings/
 │   │   └── embedding_pipeline.py
 │   │
-│   ├── vectorstore/
-│   │   └── chroma_store.py
+│   ├── extraction/
+│   │   ├── classifier.py
+│   │   └── ner_model.py
 │   │
-│   └── pipelines/
-│       └── phase1_pipeline.py
+│   ├── ingestion/
+│   │   ├── docx_parser.py
+│   │   ├── extractor_manager.py
+│   │   ├── extractors.py
+│   │   ├── ocr_engine.py
+│   │   └── pdf_parser.py
+│   │
+│   ├── monitoring/
+│   │   └── metrics.py
+│   │
+│   ├── pipelines/
+│   │   └── phase1_pipeline.py
+│   │
+│   ├── preprocessing/
+│   │   ├── chunker.py
+│   │   ├── cleaner.py
+│   │   └── preprocessing_manager.py
+│   │
+│   ├── rag/
+│   │   ├── prompt_templates.py
+│   │   └── rag_chain.py
+│   │
+│   ├── utils/
+│   │   └── logger.py
+│   │
+│   └── vectorstore/
+│       └── chroma_store.py
 │
-└── tests/
-    ├── unit/
-    └── integration/
+├── tests/
+│   ├── integration/
+│   │   ├── test_ingestion_real_data.py
+│   │   ├── test_retrieval_evaluation.py
+│   │   └── test_vectorstore_real_data.py
+│   │
+│   └── unit/
+│       ├── test_embeddings.py
+│       ├── test_ingestion.py
+│       ├── test_preprocessing.py
+│       ├── test_rag_chain.py
+│       └── test_vectorstore.py
+│
+├── .env.example
+├── .gitignore
+├── README.md
+├── requirements.txt
+└── requirements-dev.txt
 ```
 
 ---
