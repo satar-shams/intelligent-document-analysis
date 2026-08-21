@@ -1,60 +1,23 @@
-from src.embeddings.embedding_pipeline import EmbeddingPipeline
-from src.schemas import (
-    ChunkData,
-    SearchResultData,
-)
-from src.vectorstore.chroma_store import ChromaStore
+from src.rag.context_builder import ContextBuilder
+from src.rag.retriever import Retriever
 
 
 class RAGChain:
-    """Coordinate semantic retrieval for Retrieval-Augmented Generation."""
-
     def __init__(
         self,
-        embedding_pipeline: EmbeddingPipeline,
-        vector_store: ChromaStore,
+        retriever:Retriever,
+        context_builder: ContextBuilder,
+        # llm: ...,
     ) -> None:
-        self.embedding_pipeline = embedding_pipeline
-        self.vector_store = vector_store
+        self.retriever = retriever
+        self.context_builder = context_builder
 
-    def retrieve(
+    def run(
         self,
-        question: str,
-        top_k: int = 5,
-    ) -> list[SearchResultData]:
-        """
-        Retrieve the most relevant document chunks.
-
-        Args:
-            question: User query.
-            top_k: Maximum number of chunks to return.
-
-        Returns:
-            Ranked search results.
-        """
-        query_embedding = self.embedding_pipeline.embed(
-            [question],
-        )[0]
-
-        return self.vector_store.search(
-            query_embedding=query_embedding,
-            top_k=top_k,
-        )
-
-    def build_context(
-        self,
-        search_results: list[SearchResultData],
+        query: str,
+        top_k: int = 5
     ) -> str:
-        """
-        Build a context string from retrieved chunks.
+        search_result = self.retriever.retrieve(query=query, top_k=top_k)
+        context_result = self.context_builder.build(search_results=search_result)
 
-        Args:
-            search_results: Retrieved document chunks.
-
-        Returns:
-            Context string ready for an LLM.
-        """
-        return "\n\n".join(
-            result["text"]
-            for result in search_results
-        )
+        return context_result
