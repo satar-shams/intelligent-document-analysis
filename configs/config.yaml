@@ -23,8 +23,8 @@ embedding:
   model_name: all-MiniLM-L6-v2
 
 chunking:
-  chunk_size: 500
-  chunk_overlap: 50
+  chunk_size: 1000
+  chunk_overlap: 200
 
 output:
   max_text_preview_length: 200
@@ -32,3 +32,19 @@ output:
 vectorstore:
   db_path: data/vectorstore
   collection_name: documents
+
+annotation:
+  annotation_sample_size: 200
+  annotation_random_seed: 42
+
+  entity_labels:
+    - ORGANIZATION
+    - PERSON
+    - LOCATION
+    - DATE
+    - MONEY
+    - PERCENTAGE
+    - NUMBER
+    - PRODUCT
+    - FINANCIAL_METRIC
+    - DOCUMENT_REFERENCE

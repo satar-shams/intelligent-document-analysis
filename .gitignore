@@ -29,6 +29,7 @@ data/samples/*
 # Vector databases
 chroma_db/
 chroma_data/
+data/vectorstore/
 
 # MLflow
 mlruns/
@@ -56,8 +57,5 @@ temp/
 dist/
 build/
 
-# ChromaDB vector database
-
-# readme draft
+# README draft
 README.draft.md
-data/vectorstore/

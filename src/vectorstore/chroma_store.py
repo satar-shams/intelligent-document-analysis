@@ -13,6 +13,8 @@ from src.schemas import (
 class ChromaStore:
     """Persistent storage and retrieval of document embeddings."""
 
+    BATCH_SIZE = 5000
+
     def __init__(self) -> None:
         self.client = chromadb.PersistentClient(
             path=VECTOR_DB_PATH,
@@ -30,7 +32,7 @@ class ChromaStore:
         embeddings: list[list[float]],
     ) -> None:
         """
-        Store chunks and their embeddings.
+        Store chunks and their embeddings in batches.
 
         Args:
             chunks: Document chunks.
@@ -59,12 +61,19 @@ class ChromaStore:
                 }
             )
 
-        self.collection.add(
-            ids=ids,
-            documents=documents,
-            metadatas=metadatas,
-            embeddings=embeddings,
-        )
+        for start in range(
+            0,
+            len(chunks),
+            self.BATCH_SIZE,
+        ):
+            end = start + self.BATCH_SIZE
+
+            self.collection.add(
+                ids=ids[start:end],
+                documents=documents[start:end],
+                metadatas=metadatas[start:end],
+                embeddings=embeddings[start:end],
+            )
 
     def search(
         self,
@@ -112,6 +121,83 @@ class ChromaStore:
 
         return search_results
 
+    def get_chunks(
+        self,
+        limit: int | None = None,
+    ) -> list[Chunk]:
+        """
+        Retrieve stored document chunks from ChromaDB.
+
+        Args:
+            limit: Maximum number of chunks to retrieve.
+                If None, retrieve all chunks.
+
+        Returns:
+            List of Chunk objects reconstructed from ChromaDB.
+        """
+        results = self.collection.get(
+            limit=limit,
+            include=["documents", "metadatas"],
+        )
+
+        chunks: list[Chunk] = []
+
+        for (
+            chunk_id,
+            text,
+            metadata,
+        ) in zip(
+            results["ids"],
+            results["documents"],
+            results["metadatas"],
+        ):
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id,
+                    document_id=metadata["document_id"],
+                    text=text,
+                    page_start=metadata["page_start"],
+                    page_end=metadata["page_end"],
+                    section_title=metadata.get("section_title") or None,
+                )
+            )
+
+        return chunks
+
+    def get_chunks(self) -> list[Chunk]:
+        """Retrieve all stored document chunks from ChromaDB."""
+
+        results = self.collection.get(
+            include=[
+                "documents",
+                "metadatas",
+            ],
+        )
+
+        chunks: list[Chunk] = []
+
+        for (
+            chunk_id,
+            text,
+            metadata,
+        ) in zip(
+            results["ids"],
+            results["documents"],
+            results["metadatas"],
+        ):
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id,
+                    document_id=metadata["document_id"],
+                    text=text,
+                    page_start=metadata["page_start"],
+                    page_end=metadata["page_end"],
+                    section_title=metadata.get("section_title") or None,
+                )
+            )
+
+        return chunks
+
     def count(self) -> int:
         """Return the number of stored chunks."""
         return self.collection.count()
@@ -125,3 +211,18 @@ class ChromaStore:
         self.collection = self.client.get_or_create_collection(
             name=self.collection_name,
         )
+
+if __name__ == "__main__":
+    chroma_store = ChromaStore()
+
+    chunks = chroma_store.get_chunks()
+
+    print(f"Total chunks: {len(chunks)}")
+
+    for chunk in chunks[:5]:
+        print("\n" + "=" * 80)
+        print(f"Chunk ID: {chunk.chunk_id}")
+        print(f"Document: {chunk.document_id}")
+        print(f"Pages: {chunk.page_start}-{chunk.page_end}")
+        print(f"Section: {chunk.section_title}")
+        print(f"Text: {chunk.text}")

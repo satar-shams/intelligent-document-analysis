@@ -140,3 +140,13 @@ COLLECTION_NAME = _get_config_value(
     "vectorstore",
     "collection_name",
 )
+
+ANNOTATION_SAMPLE_SIZE = _get_config_value(
+    "annotation",
+    "annotation_sample_size",
+)
+
+ANNOTATION_RANDOM_SEED = _get_config_value(
+    "annotation",
+    "annotation_random_seed",
+)
