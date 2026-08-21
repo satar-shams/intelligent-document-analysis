@@ -1,149 +1,93 @@
 import pytest
+from unittest.mock import Mock
 
-from src.config import EMBEDDING_MODEL_NAME
-from src.embeddings.embedding_pipeline import EmbeddingPipeline
 from src.rag.rag_chain import RAGChain
-from src.vectorstore.chroma_store import ChromaStore
-
+from src.schemas import SearchResultData
 
 @pytest.fixture
-def embedding_pipeline():
-    return EmbeddingPipeline(
-        model_name=EMBEDDING_MODEL_NAME,
+def mock_retriever():
+    mock = Mock()
+
+    mock.retrieve.return_value = [
+        SearchResultData(
+            chunk_id="1",
+            document_id="doc-1",
+            text="Some text 1",
+            page_start=1,
+            page_end=1,
+            distance=0.1,
+        ),
+        SearchResultData(
+            chunk_id="2",
+            document_id="doc-1",
+            text="Some text 2",
+            page_start=2,
+            page_end=2,
+            distance=0.2,
+        ),
+    ]
+
+    return mock
+
+@pytest.fixture
+def mock_context_builder():
+    mock = Mock()
+
+    mock.build.return_value = (
+        "chunk_id: 1\n"
+        "document_id: doc-1\n"
+        "page_start: 1\n"
+        "page_end: 1\n"
+        "text: Some text 1"
     )
 
-
-@pytest.fixture
-def vector_store():
-    store = ChromaStore()
-    store.delete_collection()
-    yield store
-    store.delete_collection()
-
+    return mock
 
 @pytest.fixture
 def rag_chain(
-    embedding_pipeline,
-    populated_store,
+    mock_retriever,
+    mock_context_builder,
 ):
     return RAGChain(
-        embedding_pipeline=embedding_pipeline,
-        vector_store=populated_store,
-    )
+        retriever=mock_retriever,
+        context_builder=mock_context_builder,
+    )  
 
-
-@pytest.fixture
-def sample_chunks():
-    return [
-        {
-            "chunk_id": 1,
-            "page": 1,
-            "text": "Machine learning is a subset of artificial intelligence.",
-        },
-        {
-            "chunk_id": 2,
-            "page": 2,
-            "text": "Neural networks are widely used in deep learning.",
-        },
-        {
-            "chunk_id": 3,
-            "page": 3,
-            "text": "Cats are common household pets.",
-        },
-    ]
-
-
-@pytest.fixture
-def sample_search_results():
-    return [
-        {
-            "chunk_id": 1,
-            "page": 1,
-            "text": "Chunk one.",
-            "distance": 0.1,
-        },
-        {
-            "chunk_id": 2,
-            "page": 2,
-            "text": "Chunk two.",
-            "distance": 0.2,
-        },
-    ]
-
-@pytest.fixture
-def populated_store(
-    embedding_pipeline,
-    vector_store,
-    sample_chunks,
+def test_run_retrieves_search_results(
+    rag_chain,
+    mock_retriever,
 ):
-    embeddings = embedding_pipeline.embed(
-        [chunk["text"] for chunk in sample_chunks]
+    rag_chain.run(
+        query="some question",
+        top_k=3,
     )
 
-    vector_store.add(
-        chunks=sample_chunks,
-        embeddings=embeddings,
+    mock_retriever.retrieve.assert_called_once_with(
+        query="some question",
+        top_k=3,
     )
 
-    return vector_store
-
-
-def test_retrieve_returns_results(rag_chain):
-
-    results = rag_chain.retrieve(
-        question="What is deep learning?",
-        top_k=2,
-    )
-
-    assert len(results) == 2
-
-
-def test_retrieve_returns_relevant_chunk(
-    embedding_pipeline,
-    populated_store,
+def test_run_builds_context_from_search_results(
+    rag_chain,
+    mock_retriever,
+    mock_context_builder,
 ):
-    rag = RAGChain(
-        embedding_pipeline=embedding_pipeline,
-        vector_store=populated_store,
+    rag_chain.run(
+        query="some question",
+        top_k=3,
     )
 
-    results = rag.retrieve(
-        question="Neural networks",
-        top_k=1,
+    mock_context_builder.build.assert_called_once_with(
+        search_results=mock_retriever.retrieve.return_value,
     )
 
-    assert "Neural networks" in results[0]["text"]
-
-
-def test_build_context_returns_string(
-    rag_chain, sample_search_results
+def test_run_returns_context(
+    rag_chain,
+    mock_context_builder,
 ):
-
-    context = rag_chain.build_context(
-        sample_search_results,
+    result = rag_chain.run(
+        query="some question",
+        top_k=3,
     )
 
-    assert isinstance(context, str)
-
-
-def test_build_context_contains_all_chunks(
-    rag_chain, sample_search_results
-):
-
-    context = rag_chain.build_context(
-        sample_search_results,
-    )
-
-    assert "Chunk one." in context
-    assert "Chunk two." in context
-
-
-def test_build_context_separates_chunks(
-    rag_chain, sample_search_results
-):
-
-    context = rag_chain.build_context(
-        sample_search_results,
-    )
-
-    assert context == "Chunk one.\n\nChunk two."
+    assert result == mock_context_builder.build.return_value

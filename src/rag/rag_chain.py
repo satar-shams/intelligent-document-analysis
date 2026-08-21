@@ -5,7 +5,7 @@ from src.rag.retriever import Retriever
 class RAGChain:
     def __init__(
         self,
-        retriever:Retriever,
+        retriever: Retriever,
         context_builder: ContextBuilder,
         # llm: ...,
     ) -> None:
@@ -15,9 +15,15 @@ class RAGChain:
     def run(
         self,
         query: str,
-        top_k: int = 5
+        top_k: int = 5,
     ) -> str:
-        search_result = self.retriever.retrieve(query=query, top_k=top_k)
-        context_result = self.context_builder.build(search_results=search_result)
+        search_results = self.retriever.retrieve(
+            query=query,
+            top_k=top_k,
+        )
 
-        return context_result
+        context = self.context_builder.build(
+            search_results=search_results,
+        )
+
+        return context

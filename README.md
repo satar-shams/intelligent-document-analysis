@@ -1,8 +1,8 @@
 # Intelligent Document Analysis
 
-A modular document processing pipeline for extracting, preprocessing, embedding, and storing heterogeneous documents for semantic retrieval.
+A modular document processing pipeline for extracting, preprocessing, embedding, and storing heterogeneous documents for semantic retrieval and Retrieval-Augmented Generation (RAG).
 
-> **Status:** **Phase 1 complete.** The first end-to-end document processing and semantic retrieval pipeline has been implemented and verified with unit tests, real-data integration tests, and an end-to-end pipeline run.
+> **Status:** **Phase 2 complete.** The project currently provides an end-to-end document processing, semantic retrieval, and retrieval-to-context RAG pipeline, verified with unit tests, real-data integration tests, and end-to-end pipeline runs.
 
 ---
 
@@ -25,10 +25,25 @@ Phase 1 covers:
 
 📄 **[Read the Phase 1 Report](reports/phase1_report.md)**
 
+### Phase 2 — RAG Retrieval and Context Construction
+
+Phase 2 builds on the Phase 1 retrieval foundation and covers:
+
+* Query retrieval through the existing embedding and vector-store layers
+* `Retriever` component
+* `ContextBuilder` component
+* `RAGChain` orchestration
+* Top-k semantic retrieval
+* Retrieval-to-context transformation
+* Unit testing with mocked dependencies
+* Real-data integration testing
+* Grounded context generation for a future LLM generation stage
+
+📄 **[Read the Phase 2 Report](reports/phase2_report.md)**
+
 ### Upcoming Phases
 
 Additional phases will be documented here as they are implemented and completed.
 
-* Phase 2 — Not started
 * Phase 3 — Not started
 * Phase 4 — Not started
