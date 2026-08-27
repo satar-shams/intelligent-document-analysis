@@ -6,6 +6,8 @@ paths:
   raw_data: data/raw
   processed_data: data/processed
   samples: data/samples
+  annotation_data: data/processed/annotation
+  extraction_data: data/processed/extraction
 
 ingestion:
   input_directory: data/raw
@@ -36,6 +38,10 @@ vectorstore:
 annotation:
   annotation_sample_size: 200
   annotation_random_seed: 42
+
+  annotation_train_ratio: 0.70
+  annotation_validation_ratio: 0.15
+  annotation_test_ratio: 0.15
 
   entity_labels:
     - ORGANIZATION

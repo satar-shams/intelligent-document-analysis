@@ -4,6 +4,9 @@ from pathlib import Path
 
 from src.config import (
     ANNOTATION_RANDOM_SEED,
+    ANNOTATION_TEST_RATIO,
+    ANNOTATION_TRAIN_RATIO,
+    ANNOTATION_VALIDATION_RATIO,
     PROCESSED_DATA_PATH,
 )
 
@@ -13,29 +16,30 @@ ANNOTATION_DIRECTORY = (
     / "annotation"
 )
 
+EXTRACTION_DIRECTORY = (
+    Path(PROCESSED_DATA_PATH)
+    / "extraction"
+)
+
 INPUT_FILE = (
     ANNOTATION_DIRECTORY
     / "annotated_dataset.jsonl"
 )
 
 TRAIN_FILE = (
-    ANNOTATION_DIRECTORY
+    EXTRACTION_DIRECTORY
     / "train.jsonl"
 )
 
 VALIDATION_FILE = (
-    ANNOTATION_DIRECTORY
+    EXTRACTION_DIRECTORY
     / "validation.jsonl"
 )
 
 TEST_FILE = (
-    ANNOTATION_DIRECTORY
+    EXTRACTION_DIRECTORY
     / "test.jsonl"
 )
-
-TRAIN_RATIO = 0.70
-VALIDATION_RATIO = 0.15
-TEST_RATIO = 0.15
 
 
 def load_dataset(
@@ -103,12 +107,14 @@ def split_dataset(
     ).shuffle(shuffled)
 
     train_end = int(
-        total * TRAIN_RATIO
+        total * ANNOTATION_TRAIN_RATIO
     )
 
     validation_end = (
         train_end
-        + int(total * VALIDATION_RATIO)
+        + int(
+            total * ANNOTATION_VALIDATION_RATIO
+        )
     )
 
     train = shuffled[:train_end]
@@ -136,6 +142,11 @@ def main() -> None:
 
     train, validation, test = split_dataset(
         records
+    )
+
+    EXTRACTION_DIRECTORY.mkdir(
+        parents=True,
+        exist_ok=True,
     )
 
     write_dataset(
@@ -171,6 +182,17 @@ def main() -> None:
 
     print(
         f"\nRandom seed: {ANNOTATION_RANDOM_SEED}"
+    )
+
+    print("\nSplit ratios:")
+    print(
+        f"  Train:      {ANNOTATION_TRAIN_RATIO}"
+    )
+    print(
+        f"  Validation: {ANNOTATION_VALIDATION_RATIO}"
+    )
+    print(
+        f"  Test:       {ANNOTATION_TEST_RATIO}"
     )
 
     print("\nFiles written:")

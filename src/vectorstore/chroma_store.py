@@ -164,40 +164,6 @@ class ChromaStore:
 
         return chunks
 
-    def get_chunks(self) -> list[Chunk]:
-        """Retrieve all stored document chunks from ChromaDB."""
-
-        results = self.collection.get(
-            include=[
-                "documents",
-                "metadatas",
-            ],
-        )
-
-        chunks: list[Chunk] = []
-
-        for (
-            chunk_id,
-            text,
-            metadata,
-        ) in zip(
-            results["ids"],
-            results["documents"],
-            results["metadatas"],
-        ):
-            chunks.append(
-                Chunk(
-                    chunk_id=chunk_id,
-                    document_id=metadata["document_id"],
-                    text=text,
-                    page_start=metadata["page_start"],
-                    page_end=metadata["page_end"],
-                    section_title=metadata.get("section_title") or None,
-                )
-            )
-
-        return chunks
-
     def count(self) -> int:
         """Return the number of stored chunks."""
         return self.collection.count()
@@ -215,7 +181,7 @@ class ChromaStore:
 if __name__ == "__main__":
     chroma_store = ChromaStore()
 
-    chunks = chroma_store.get_chunks()
+    chunks = chroma_store.get_chunks(limit=100)
 
     print(f"Total chunks: {len(chunks)}")
 

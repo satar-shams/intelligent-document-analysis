@@ -150,3 +150,28 @@ ANNOTATION_RANDOM_SEED = _get_config_value(
     "annotation",
     "annotation_random_seed",
 )
+
+ANNOTATION_TRAIN_RATIO = _get_config_value(
+    "annotation",
+    "annotation_train_ratio",
+)
+
+ANNOTATION_VALIDATION_RATIO = _get_config_value(
+    "annotation",
+    "annotation_validation_ratio",
+)
+
+ANNOTATION_TEST_RATIO = _get_config_value(
+    "annotation",
+    "annotation_test_ratio",
+)
+
+ANNOTATION_DATA_PATH = _get_config_value(
+    "paths",
+    "annotation_data",
+)
+
+EXTRACTION_DATA_PATH = _get_config_value(
+    "paths",
+    "extraction_data",
+)
