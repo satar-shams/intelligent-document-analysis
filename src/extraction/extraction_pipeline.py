@@ -3,7 +3,7 @@ from pathlib import Path
 
 from src.annotation.annotator import AnnotationContext
 from src.config import EXTRACTION_DATA_PATH
-from src.extraction.ner_model import NERModel
+from src.extraction.entity_extractor import EntityExtractor
 
 
 INPUT_FILE = (
@@ -13,7 +13,7 @@ INPUT_FILE = (
 
 OUTPUT_FILE = (
     Path(EXTRACTION_DATA_PATH)
-    / "ner_predictions.jsonl"
+    / "predictions.jsonl"
 )
 
 
@@ -70,7 +70,7 @@ def run_extraction(
     records: list[dict],
 ) -> list[dict]:
 
-    ner_model = NERModel()
+    entity_extractor = EntityExtractor()
 
     results: list[dict] = []
 
@@ -83,7 +83,7 @@ def run_extraction(
             page_end=record["page_end"],
         )
 
-        entities = ner_model.predict(
+        entities = entity_extractor.extract(
             text=record["text"],
             context=context,
         )
@@ -113,7 +113,7 @@ def run_extraction(
 def main() -> None:
 
     print("=" * 60)
-    print("NER EXTRACTION PIPELINE")
+    print("ENTITY EXTRACTION PIPELINE")
     print("=" * 60)
 
     records = load_dataset(
@@ -163,7 +163,7 @@ def main() -> None:
     )
 
     print("\n" + "=" * 60)
-    print("NER EXTRACTION COMPLETED")
+    print("ENTITY EXTRACTION COMPLETED")
     print("=" * 60)
 
 
