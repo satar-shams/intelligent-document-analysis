@@ -171,3 +171,26 @@ def test_predict_empty_text(
     assert entities == []
 
     mock_pipeline.return_value.assert_not_called()
+
+@patch("src.extraction.ner_model.pipeline")
+@patch(
+    "src.extraction.ner_model."
+    "AutoModelForTokenClassification"
+)
+@patch("src.extraction.ner_model.AutoTokenizer")
+def test_model_name_can_be_overridden(
+    mock_tokenizer,
+    mock_model,
+    mock_pipeline,
+):
+    NERModel(
+        model_name="test-model"
+    )
+
+    mock_tokenizer.from_pretrained.assert_called_once_with(
+        "test-model"
+    )
+
+    mock_model.from_pretrained.assert_called_once_with(
+        "test-model"
+    )

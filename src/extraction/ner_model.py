@@ -7,8 +7,7 @@ from transformers import (
 from src.annotation.annotator import AnnotationContext
 from src.schemas import ExtractedEntity
 
-
-MODEL_NAME = "dslim/bert-base-NER"
+from src.config import NER_MODEL_NAME
 
 
 LABEL_MAPPING = {
@@ -23,7 +22,7 @@ class NERModel:
 
     def __init__(
         self,
-        model_name: str = MODEL_NAME,
+        model_name: str = NER_MODEL_NAME,
     ) -> None:
 
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -90,7 +89,9 @@ class NERModel:
 
 def main() -> None:
 
-    model = NERModel()
+    model = NERModel(
+        model_name="some-other-model"
+    )
 
     context = AnnotationContext(
         chunk_id="test_chunk_001",

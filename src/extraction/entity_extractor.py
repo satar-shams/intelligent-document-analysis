@@ -17,10 +17,19 @@ RULE_BASED_PRIORITY_LABELS = {
 class EntityExtractor:
     """Combine deterministic rules and NER predictions."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        ner_model_name: str | None = None,
+    ) -> None:
 
         self.rule_based_extractor = AutomaticAnnotator()
-        self.ner_model = NERModel()
+
+        if ner_model_name is None:
+            self.ner_model = NERModel()
+        else:
+            self.ner_model = NERModel(
+                model_name=ner_model_name
+            )
 
     def extract(
         self,
@@ -124,6 +133,8 @@ class EntityExtractor:
             first.start < second.end
             and first.end > second.start
         )
+
+
 def main() -> None:
 
     extractor = EntityExtractor()

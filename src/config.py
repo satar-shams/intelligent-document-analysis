@@ -175,3 +175,8 @@ EXTRACTION_DATA_PATH = _get_config_value(
     "paths",
     "extraction_data",
 )
+
+NER_MODEL_NAME = _get_config_value(
+    "ner",
+    "model_name",
+)

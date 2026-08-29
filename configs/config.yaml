@@ -36,7 +36,7 @@ vectorstore:
   collection_name: documents
 
 annotation:
-  annotation_sample_size: 200
+  annotation_sample_size: 500
   annotation_random_seed: 42
 
   annotation_train_ratio: 0.70
@@ -54,3 +54,6 @@ annotation:
     - PRODUCT
     - FINANCIAL_METRIC
     - DOCUMENT_REFERENCE
+
+ner:
+  model_name: ritam-m/bert-base-company-ner

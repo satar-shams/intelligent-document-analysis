@@ -1,625 +1,1477 @@
-# Intelligent Document Analysis — Phase 2
+# Intelligent Document Analysis (IDA)
 
-Phase 2 extends the Phase 1 semantic retrieval foundation into a simple RAG-oriented retrieval and context-building layer.
+# Phase 2 — Annotation and Entity Extraction
 
-> **Status:** **Phase 2 complete.** Query retrieval, context construction, RAG orchestration, unit tests, and a real-data end-to-end integration test have been implemented and verified.
-
----
-
-# Overview
-
-Phase 1 established the document processing and semantic retrieval foundation:
-
-```text
-Documents
-    ↓
-Extraction
-    ↓
-Preprocessing
-    ↓
-Chunking
-    ↓
-Embeddings
-    ↓
-ChromaDB
-    ↓
-Semantic Search
-```
-
-Phase 2 builds on that existing retrieval layer.
-
-The main goal is to transform a user query into relevant document chunks and then transform those chunks into a structured text context suitable for a later generation step.
-
-The Phase 2 flow is:
-
-```text
-User Query
-    ↓
-Retriever
-    ↓
-Semantic Search
-    ↓
-Search Results
-    ↓
-ContextBuilder
-    ↓
-Context
-    ↓
-RAGChain
-```
-
-The current Phase 2 implementation does **not** require an LLM. It establishes the retrieval and context layer that can later provide grounded information to an LLM.
+## Final Technical Report
 
 ---
 
-# Phase 2 Components
+# 1. Phase Overview
 
-Phase 2 introduces three main components:
+Phase 2 of the Intelligent Document Analysis (IDA) project established the annotation and entity-extraction foundation required for structured information extraction from processed document chunks.
+
+The objective of Phase 2 was not to achieve production-level NER accuracy. Instead, the goal was to build a complete, reproducible, and understandable extraction workflow that could later be improved without redesigning the system.
+
+The Phase 2 workflow is:
 
 ```text
-src/rag/
-├── context_builder.py
-├── __init__.py
-├── prompt_templates.py
-├── rag_chain.py
-└── retriever.py
+Processed Document Chunks
+          ↓
+      Sampling
+          ↓
+   Weak Annotation
+          ↓
+Dataset Validation & Analysis
+          ↓
+ Train / Validation / Test Split
+          ↓
+      NER Baseline
+          ↓
+ Hybrid Entity Extraction
+          ↓
+Structured Predictions
+          ↓
+     Evaluation
+          ↓
+    Error Analysis
 ```
+
+Phase 2 therefore establishes both the **data foundation** and the **extraction architecture** for structured entity recognition in IDA.
 
 ---
 
-# Retriever
+# 2. Phase 2 Objectives
 
-The `Retriever` connects a natural-language query to the existing Phase 1 embedding and vector-store components.
+The main objectives of Phase 2 were:
 
-```text
-src/rag/retriever.py
-```
+1. Define a structured entity schema.
+2. Establish annotation guidelines.
+3. Sample representative document chunks from ChromaDB.
+4. Generate weak annotations using deterministic rules.
+5. Store annotation data in JSONL format.
+6. Validate the generated dataset.
+7. Analyze dataset characteristics and entity distribution.
+8. Create deterministic train/validation/test splits.
+9. Implement reusable entity evaluation.
+10. Establish a pretrained NER baseline.
+11. Compare candidate NER models.
+12. Integrate NER with deterministic extraction.
+13. Implement duplicate and overlap handling.
+14. Produce structured extraction predictions.
+15. Evaluate rule-based, NER, and Hybrid extraction.
+16. Analyze the main extraction errors and limitations.
 
-Its responsibilities are:
-
-* Receive a natural-language query
-* Generate an embedding for the query
-* Search ChromaDB using that embedding
-* Return the top-k semantic search results
-
-The implementation uses dependency injection:
-
-```python
-Retriever(
-    embedding_pipeline=embedding_pipeline,
-    chroma_store=chroma_store,
-)
-```
-
-The main method is:
-
-```python
-retrieve(
-    query: str,
-    top_k: int = 5,
-) -> list[SearchResultData]
-```
-
-The retrieval process is:
-
-```text
-Query
-  ↓
-EmbeddingPipeline
-  ↓
-Query Embedding
-  ↓
-ChromaStore.search()
-  ↓
-list[SearchResultData]
-```
-
-The Retriever does not implement embedding generation or vector search itself. It delegates those responsibilities to the existing Phase 1 components.
+The phase was intentionally designed as a **baseline architecture and evaluation stage**, rather than an attempt to fully optimize the final extraction model.
 
 ---
 
-# Context Builder
+# 3. Entity Schema
 
-The `ContextBuilder` converts retrieved `SearchResultData` objects into a single text context.
-
-```text
-src/rag/context_builder.py
-```
-
-It receives:
+The project uses the existing `ExtractedEntity` structure:
 
 ```python
-list[SearchResultData]
+@dataclass
+class ExtractedEntity:
+
+    text: str
+    label: str
+    start: int
+    end: int
+    confidence: float | None
+    chunk_id: str
+    document_id: str
+    page_start: int
+    page_end: int
 ```
 
-and produces:
+Each entity therefore contains both the extracted information and its source context.
 
-```python
-str
-```
-
-Each result is represented with its document and page metadata:
+The intended IDA entity schema is:
 
 ```text
-chunk_id: ...
-document_id: ...
-page_start: ...
-page_end: ...
-text: ...
+ORGANIZATION
+PERSON
+LOCATION
+DATE
+MONEY
+PERCENTAGE
+NUMBER
+PRODUCT
+FINANCIAL_METRIC
+DOCUMENT_REFERENCE
 ```
 
-Multiple chunks are separated by blank lines.
+The schema is intentionally extensible.
 
-Example:
+The currently implemented deterministic annotation rules primarily cover:
 
 ```text
-chunk_id: 1
-document_id: doc-1
-page_start: 1
-page_end: 1
-text: Some text 1
-
-chunk_id: 2
-document_id: doc-1
-page_start: 2
-page_end: 2
-text: Some text 2
+DATE
+MONEY
+PERCENTAGE
+ORGANIZATION
+PRODUCT
 ```
 
-The original retrieved chunk text is preserved.
-
-The ContextBuilder therefore acts as the bridge between structured retrieval results and a text-based context that can later be inserted into an LLM prompt.
+The broader schema provides room for additional domain-specific extraction in future work.
 
 ---
 
-# RAG Chain
+# 4. Annotation Guidelines
 
-The `RAGChain` provides the orchestration layer for the Phase 2 flow.
+Annotation guidelines are documented in:
 
 ```text
-src/rag/rag_chain.py
+docs/annotation_guidelines.md
 ```
 
-It receives:
+The guidelines define the intended interpretation of entity categories and provide a common basis for automatic annotation and future human annotation.
+
+The current annotation strategy is deliberately simple and focused on establishing a reproducible baseline.
+
+---
+
+# 5. Dataset Sampling
+
+The source ChromaDB collection contained:
+
+```text
+5,837 chunks
+```
+
+Rather than attempting to manually annotate the complete collection, a deterministic sample was created.
+
+The sampling configuration is:
+
+```yaml
+annotation:
+  annotation_sample_size: 200
+  annotation_random_seed: 42
+```
+
+The resulting process is:
+
+```text
+5,837 ChromaDB chunks
+        ↓
+Deterministic sampling
+        ↓
+200 chunks
+```
+
+Using a fixed random seed makes the resulting dataset reproducible.
+
+Relevant implementation:
+
+```text
+src/annotation/sampler.py
+src/annotation/sample_chunks.py
+```
+
+The sampled dataset is used as the development and evaluation foundation for the Phase 2 extraction experiments.
+
+---
+
+# 6. Weak Annotation
+
+The initial annotation system uses deterministic rules rather than a trained model.
+
+Implementation:
+
+```text
+src/annotation/annotator.py
+src/annotation/rules.py
+```
+
+The main component is:
+
+```text
+AutomaticAnnotator
+```
+
+It combines regex-based and dictionary-based extraction.
+
+## 6.1 Regex-Based Extraction
+
+Regular expressions are used for structured entities such as:
+
+```text
+DATE
+MONEY
+PERCENTAGE
+```
+
+Examples include:
+
+```text
+2025
+January 15, 2025
+January 2025
+
+$10 million
+$5 billion
+$100
+
+25%
+12.5%
+25 percent
+```
+
+The deterministic rules produce structured `ExtractedEntity` objects with character offsets, confidence values, and source-document metadata.
+
+## 6.2 Dictionary-Based Extraction
+
+Dictionaries are used for known organizations and products.
+
+Examples include organizations such as:
+
+```text
+Microsoft
+Microsoft Corporation
+OpenAI
+SEC
+```
+
+and products such as:
+
+```text
+Microsoft 365
+Azure
+Windows
+LinkedIn
+GitHub
+Xbox
+Office
+Teams
+```
+
+The dictionary approach provides deterministic recognition for entities that can be identified from known vocabulary.
+
+---
+
+# 7. Annotation Confidence
+
+The current deterministic confidence assignments are:
+
+| Entity Type  | Confidence |
+| ------------ | ---------: |
+| DATE         |       0.99 |
+| MONEY        |       0.99 |
+| PERCENTAGE   |       0.99 |
+| ORGANIZATION |       0.90 |
+| PRODUCT      |       0.95 |
+
+These values represent **rule-system confidence assignments**.
+
+They are not statistically calibrated probabilities and should not be interpreted as such.
+
+---
+
+# 8. Annotation Dataset
+
+The annotation workflow produces JSONL datasets.
+
+Intermediate dataset:
+
+```text
+data/processed/annotation/annotation_dataset.jsonl
+```
+
+Annotated dataset:
+
+```text
+data/processed/annotation/annotated_dataset.jsonl
+```
+
+Each record preserves the original chunk information and adds its entity list.
+
+Chunks without entities are retained.
+
+This is important because negative examples are useful for later extraction and NER development.
+
+---
+
+# 9. Dataset Statistics
+
+The final sampled annotation dataset contains:
+
+```text
+Total chunks:             200
+Chunks with entities:      69
+Chunks without entities:  131
+Total entities:            205
+Average entities/chunk:   1.02
+Maximum entities/chunk:    19
+```
+
+Entity distribution:
+
+```text
+DATE             68
+PRODUCT          62
+MONEY            28
+ORGANIZATION     25
+PERCENTAGE       22
+```
+
+The dataset is therefore relatively small.
+
+It should be considered a **development and baseline evaluation dataset**, not a production-scale training corpus.
+
+---
+
+# 10. Dataset Validation
+
+Dataset validation is implemented in:
+
+```text
+src/annotation/validate_dataset.py
+```
+
+The validator checks:
+
+* required chunk fields;
+* required entity fields;
+* valid entity labels;
+* character offsets;
+* correspondence between entity text and source text;
+* chunk/document metadata consistency;
+* overlapping entity spans.
+
+Entity offsets must satisfy:
+
+```text
+0 <= start < end <= len(chunk_text)
+```
+
+and:
 
 ```python
-RAGChain(
-    retriever=retriever,
-    context_builder=context_builder,
-)
+chunk_text[start:end] == entity["text"]
 ```
 
-The main method is:
+The final validation result is:
 
-```python
-run(
-    query: str,
-    top_k: int = 5,
-) -> str
+```text
+Total chunks:       200
+Total entities:     205
+Validation errors:    0
 ```
 
-The method performs two operations:
+Therefore, the generated dataset is **structurally valid**.
 
-```python
-search_result = self.retriever.retrieve(
-    query=query,
-    top_k=top_k,
-)
+This result does not prove semantic annotation accuracy.
 
-context_result = self.context_builder.build(
-    search_results=search_result,
-)
+---
 
-return context_result
-```
+# 11. Weak Annotation vs. Ground Truth
+
+A central limitation of Phase 2 is the distinction between **weak annotation** and **human-verified ground truth**.
+
+The current annotations were generated automatically using deterministic rules that also form part of the extraction system.
 
 Therefore:
 
 ```text
-Query
-  ↓
-Retriever
-  ↓
-Top-K Search Results
-  ↓
-ContextBuilder
-  ↓
-Formatted Context
-  ↓
-Returned by RAGChain
+Validation successful
 ```
 
-The RAG chain intentionally remains simple at this stage.
+means that the dataset is structurally consistent.
 
-It does not contain embedding logic, vector-store logic, or context-formatting logic. Those responsibilities remain inside their respective components.
-
----
-
-# Relationship to Phase 1
-
-Phase 2 does not duplicate the functionality developed in Phase 1.
-
-Instead, it reuses the existing components:
+It does not mean:
 
 ```text
-Phase 1
-────────────────────────────
-EmbeddingPipeline
-ChromaStore
-SearchResultData
-────────────────────────────
-             ↓
-             ↓
-Phase 2
-────────────────────────────
-Retriever
-ContextBuilder
-RAGChain
-────────────────────────────
+100% semantic annotation accuracy
 ```
 
-This separation keeps the architecture modular.
+For example, a dictionary can identify a known product name in a context where it does not function as a product entity. Similarly, a regular expression can identify a date-like or monetary expression without understanding its semantic role.
 
-The Retriever uses the Phase 1 embedding and vector-store infrastructure rather than implementing another retrieval mechanism.
+Consequently, the current dataset should be treated as a **weakly annotated benchmark**.
+
+This limitation is particularly important when interpreting the final extraction metrics.
 
 ---
 
-# Top-K Retrieval
+# 12. Dataset Split
 
-The RAG chain does not send the complete document collection to a future LLM.
+The annotated dataset is divided into:
 
-For the current dataset, there are approximately 1,000 chunks.
+```text
+70% → Training
+15% → Validation
+15% → Test
+```
 
-If:
+using random seed:
+
+```text
+42
+```
+
+The resulting split is:
+
+```text
+Total:        200
+Train:        140
+Validation:    30
+Test:          30
+```
+
+Generated files:
+
+```text
+data/processed/extraction/train.jsonl
+data/processed/extraction/validation.jsonl
+data/processed/extraction/test.jsonl
+```
+
+The deterministic split ensures that evaluation can be reproduced.
+
+---
+
+# 13. Annotation Pipeline
+
+The complete annotation workflow is orchestrated by:
+
+```text
+src/annotation/annotation_pipeline.py
+```
+
+The pipeline combines:
+
+```text
+Create Dataset
+      ↓
+Apply Annotations
+      ↓
+Validate
+      ↓
+Analyze
+      ↓
+Split
+```
+
+It can be executed with:
+
+```bash
+python -m src.annotation.annotation_pipeline
+```
+
+The complete data-preparation flow is:
+
+```text
+5,837 source chunks
+        ↓
+200 sampled chunks
+        ↓
+205 weakly annotated entities
+        ↓
+0 validation errors
+        ↓
+140 train
+30 validation
+30 test
+```
+
+This establishes a reproducible annotation and dataset-preparation pipeline.
+
+---
+
+# 14. Annotation Tests
+
+The annotation subsystem contains tests for:
+
+```text
+tests/annotation/
+
+├── test_annotator.py
+├── test_evaluator.py
+├── test_sampler.py
+├── test_split_dataset.py
+└── test_validate_dataset.py
+```
+
+The tests cover the core infrastructure, including:
+
+* entity extraction behavior;
+* sampling;
+* deterministic splitting;
+* dataset validation;
+* evaluation logic.
+
+The current annotation test result is:
+
+```text
+23 passed
+```
+
+The purpose of these tests is to verify the core infrastructure rather than exhaustively test every possible entity pattern.
+
+---
+
+# 15. Entity Evaluation Framework
+
+A reusable evaluation framework was implemented in:
+
+```text
+src/annotation/evaluator.py
+```
+
+It calculates:
+
+```text
+True Positives
+False Positives
+False Negatives
+Precision
+Recall
+F1
+```
+
+Metrics can also be calculated by entity type.
+
+The evaluator uses counters rather than simple sets so that duplicate entity mentions can be handled correctly.
+
+The evaluation framework provides the common basis for comparing the different extraction strategies.
+
+---
+
+# 16. NER Baseline
+
+A pretrained Transformer NER component was introduced after the annotation dataset had been established.
+
+Implementation:
+
+```text
+src/extraction/ner_model.py
+```
+
+The initial baseline was:
+
+```text
+dslim/bert-base-NER
+```
+
+The model provides general-purpose English NER without requiring model training.
+
+Its primary labels are:
+
+```text
+ORG
+PER
+LOC
+MISC
+```
+
+The project maps the supported labels to the IDA schema:
+
+```text
+ORG → ORGANIZATION
+PER → PERSON
+LOC → LOCATION
+```
+
+`MISC` is currently ignored because it does not directly correspond to a specific IDA entity category.
+
+---
+
+# 17. NER Output
+
+The NER component converts model predictions into the common `ExtractedEntity` structure.
+
+Each prediction retains:
+
+```text
+text
+label
+start
+end
+confidence
+chunk_id
+document_id
+page_start
+page_end
+```
+
+This allows the NER component to remain compatible with the rest of the IDA extraction architecture.
+
+The confidence values originate from the NER model and are preserved as model outputs. They are not treated as guaranteed calibrated probabilities.
+
+---
+
+# 18. Initial NER Findings
+
+The general-purpose NER approach successfully identifies common contextual entities such as:
+
+```text
+Microsoft       → ORGANIZATION
+Satya Nadella   → PERSON
+New York        → LOCATION
+```
+
+However, the IDA entity schema is broader than the label space of the general-purpose model.
+
+IDA requires categories including:
+
+```text
+DATE
+MONEY
+PERCENTAGE
+PRODUCT
+FINANCIAL_METRIC
+DOCUMENT_REFERENCE
+NUMBER
+```
+
+while the baseline primarily provides:
+
+```text
+PERSON
+ORGANIZATION
+LOCATION
+MISC
+```
+
+Therefore, standalone NER cannot provide complete coverage of the IDA extraction requirements.
+
+This motivated the Hybrid extraction architecture.
+
+---
+
+# 19. NER Candidate Model Comparison
+
+Several pretrained models were evaluated as candidates:
+
+```text
+dslim/bert-base-NER
+gamug/sec-bert-finer-ord-ner
+Jean-Baptiste/roberta-large-ner-english
+ritam-m/bert-base-company-ner
+musk1209/finsight-ner
+```
+
+Under the candidate-model evaluation configuration, `musk1209/finsight-ner` produced the highest F1 among the evaluated candidates:
+
+```text
+Precision: 0.1897
+Recall:    0.7333
+F1:        0.3014
+```
+
+It was therefore selected as the NER component for the current Hybrid evaluation.
+
+This selection is an engineering baseline choice rather than a claim that the model is globally optimal for IDA.
+
+---
+
+# 20. Why Hybrid Extraction?
+
+The experiments showed that neither deterministic extraction nor standalone NER provides the complete desired extraction architecture.
+
+Deterministic extraction is effective for structured and domain-specific patterns:
+
+```text
+DATE
+MONEY
+PERCENTAGE
+PRODUCT
+known ORGANIZATION names
+```
+
+NER provides contextual recognition for entities that are more difficult to describe using deterministic rules:
+
+```text
+PERSON
+ORGANIZATION
+LOCATION
+```
+
+The resulting strategy is:
+
+```text
+Rules
+   +
+Dictionaries
+   +
+NER
+   =
+Broader entity coverage
+```
+
+The Hybrid architecture therefore combines deterministic precision for known patterns with contextual recognition from NER.
+
+---
+
+# 21. Hybrid EntityExtractor
+
+The main Hybrid abstraction is:
+
+```text
+src/extraction/entity_extractor.py
+```
+
+The `EntityExtractor` combines:
+
+```text
+AutomaticAnnotator
+        +
+NERModel
+```
+
+and returns one unified list of:
+
+```text
+ExtractedEntity
+```
+
+The rest of the application can therefore use:
 
 ```python
-top_k = 5
+entities = extractor.extract(
+    text=text,
+    context=context,
+)
 ```
 
-the flow is:
+without needing to know which extraction mechanism produced each entity.
+
+This creates a clean interface for future model or rule changes.
+
+---
+
+# 22. Entity Merging and Conflict Resolution
+
+The Hybrid extractor does not simply concatenate rule-based and NER predictions.
+
+It implements explicit conflict handling.
+
+## 22.1 Exact Duplicates
+
+If both systems identify the same span and label:
 
 ```text
-~1,000 stored chunks
-        ↓
-   semantic search
-        ↓
-    top 5 chunks
-        ↓
-  ContextBuilder
-        ↓
-  context for LLM
+Microsoft → ORGANIZATION
 ```
 
-Only the retrieved chunks are intended to become the context supplied to a later generation component.
+only one entity is retained.
 
-This keeps the generation step focused on the most relevant document content instead of sending the complete document collection.
+## 22.2 Non-Overlapping Entities
 
----
-
-# Data Contract
-
-Phase 2 uses the existing `SearchResultData` schema:
-
-```python
-@dataclass
-class SearchResultData:
-    chunk_id: str
-    document_id: str
-    text: str
-    page_start: int
-    page_end: int
-    distance: float
-    section_title: str | None = None
-```
-
-This provides the information required to construct grounded context while preserving source information such as document and page location.
-
----
-
-# Testing
-
-Phase 2 was tested at both the **unit** and **integration** levels.
-
-## Retriever Unit Tests
-
-The Retriever is tested independently using mocked dependencies.
-
-The embedding pipeline and ChromaDB store are mocked so that the tests focus only on Retriever behavior.
-
-The tests verify that:
-
-* A query is passed to the embedding pipeline correctly
-* The query is wrapped in the expected list format
-* The generated embedding is passed to ChromaDB
-* The configured `top_k` value is passed correctly
-* Search results from ChromaDB are returned by the Retriever
-
-Run:
-
-```bash
-python -m pytest tests/unit/test_retriever.py -v
-```
-
----
-
-## Context Builder Unit Tests
-
-The ContextBuilder is tested independently using controlled `SearchResultData` objects.
-
-The tests verify that:
-
-* The result is a string
-* Retrieved chunks are formatted correctly
-* Metadata is included
-* Multiple chunks are separated correctly
-* The final context matches the expected structure
-
-Run:
-
-```bash
-python -m pytest tests/unit/test_context_builder.py -v
-```
-
----
-
-## RAG Chain Unit Tests
-
-The RAGChain orchestration is tested using mocked Retriever and ContextBuilder objects.
-
-The tests verify that:
-
-1. The query and `top_k` are passed to the Retriever.
-2. The Retriever's returned value is passed to ContextBuilder.
-3. The value returned by ContextBuilder is returned by `RAGChain.run()`.
-
-The internal behavior of Retriever and ContextBuilder is intentionally not retested here because those components have their own unit tests.
-
----
-
-## Real-Data Integration Test
-
-A real-data integration test verifies the complete Phase 2 flow using the actual ChromaDB data and real implementations.
-
-The test constructs:
+If the systems identify different entities:
 
 ```text
-EmbeddingPipeline
-      ↓
-ChromaStore
-      ↓
-Retriever
-      ↓
-ContextBuilder
-      ↓
-RAGChain
+Azure      → PRODUCT
+Microsoft  → ORGANIZATION
 ```
 
-and executes a real query:
+both can be retained.
+
+## 22.3 Overlapping Entities
+
+When an NER prediction overlaps with a rule-based entity, the extractor checks the rule-based label priority.
+
+The current priority labels are:
 
 ```text
-"When he came to the war he was barely eighteen"
+DATE
+MONEY
+PERCENTAGE
+PRODUCT
 ```
 
-The test verifies that the complete flow produces a non-empty string context.
+These deterministic entities are preserved when they conflict with a generic NER prediction.
 
-Run:
+For non-priority overlaps, the NER prediction can replace the existing rule-based entity.
 
-```bash
-python -m pytest tests/integration/test_rag_chain_real_data.py -v -s
-```
-
-The `-s` option allows output printed by the integration test to be displayed directly in the terminal when needed for inspection.
+The final entity list is sorted by character position.
 
 ---
 
-# Phase 2 Test Coverage
+# 23. Extraction Pipeline
 
-The Phase 2 test structure is:
+The end-to-end extraction pipeline is implemented in:
 
 ```text
-Unit Tests
-│
-├── Retriever
-│   ├── Query embedding
-│   ├── ChromaDB search
-│   └── Result propagation
-│
-├── ContextBuilder
-│   ├── String output
-│   └── Context formatting
-│
-└── RAGChain
-    ├── Retriever orchestration
-    ├── ContextBuilder orchestration
-    └── Final result propagation
+src/extraction/extraction_pipeline.py
+```
 
-Integration Test
-│
-└── Complete real-data RAG flow
+Input:
+
+```text
+data/processed/extraction/test.jsonl
+```
+
+Output:
+
+```text
+data/processed/extraction/predictions.jsonl
+```
+
+Each output record retains the original chunk information and adds:
+
+```json
+"predicted_entities": [...]
+```
+
+This preserves the relationship between predictions and their source document chunks and allows the predictions to be evaluated later.
+
+---
+
+# 24. Current Pipeline Output
+
+The current extraction pipeline processes:
+
+```text
+30 test chunks
+```
+
+and produces:
+
+```text
+Chunks processed:          30
+Chunks with entities:      14
+Total predicted entities:  47
+```
+
+The prediction records preserve entity metadata including:
+
+```text
+text
+label
+character offsets
+confidence
+chunk metadata
+document metadata
+page information
 ```
 
 ---
 
-# Current Phase 2 Status
+# 25. Final Hybrid Evaluation
 
-| Component                         | Status |
-| --------------------------------- | :----: |
-| Retriever                         |   ✅    |
-| Context Builder                   |   ✅    |
-| RAG Chain                         |   ✅    |
-| Retriever Unit Tests              |   ✅    |
-| Context Builder Unit Tests        |   ✅    |
-| RAG Chain Unit Tests              |   ✅    |
-| Real-Data RAG Integration Test    |   ✅    |
-| Phase 2 Retrieval-to-Context Flow |   ✅    |
+The final evaluation compares three strategies:
+
+```text
+1. Rule-based
+2. NER
+3. Hybrid
+```
+
+The selected NER model is:
+
+```text
+musk1209/finsight-ner
+```
+
+The latest evaluation dataset contains:
+
+```text
+Test chunks:        30
+Expected entities: 118
+```
+
+The final results are:
+
+| Strategy   |   TP |   FP |   FN | Precision | Recall |     F1 |
+| ---------- | ---: | ---: | ---: | --------: | -----: | -----: |
+| Rule-based |  118 |    0 |    0 |    1.0000 | 1.0000 | 1.0000 |
+| NER        |    0 |   58 |  118 |    0.0000 | 0.0000 | 0.0000 |
+| Hybrid     |  116 |   44 |    2 |    0.7250 | 0.9831 | 0.8345 |
+
+The Hybrid extractor therefore achieved:
+
+```text
+TP:        116
+FP:         44
+FN:          2
+
+Precision:  72.50%
+Recall:     98.31%
+F1:         83.45%
+```
+
+The Hybrid system recovered:
+
+```text
+116 / 118
+```
+
+expected entities.
+
+The most significant quantitative characteristic is the very high recall.
+
+The main weakness is the increase in false positives caused primarily by the NER component.
 
 ---
 
-# Phase 2 Output
+# 26. Interpretation of the Evaluation
 
-The main output of Phase 2 is a **grounded text context** constructed from the most relevant retrieved chunks.
+The rule-based system achieved:
+
+```text
+Precision = 100%
+Recall    = 100%
+F1        = 100%
+```
+
+on this particular test set.
+
+However, these values must not be interpreted as evidence of perfect real-world entity extraction.
+
+The reason is that the evaluation annotations were generated by the deterministic annotation system itself.
 
 Conceptually:
 
 ```text
-User Query
-    ↓
-Semantic Retrieval
-    ↓
-Top-K Relevant Chunks
-    ↓
-Structured Context
+Expected Entities
+        ↑
+AutomaticAnnotator
 ```
 
-For example:
+while Hybrid predictions are generated through:
 
 ```text
-chunk_id: 59
-document_id: sample-text-pdf
-page_start: 19
-page_end: 19
-text: When he came to the war he was barely eighteen...
-
-chunk_id: ...
-document_id: ...
-page_start: ...
-page_end: ...
-text: ...
+EntityExtractor
+      ├── AutomaticAnnotator
+      └── NERModel
 ```
 
-This context is ready to become the evidence supplied to a future answer-generation component.
+Therefore, part of the evaluation target is inherently related to one of the prediction mechanisms.
+
+The results primarily demonstrate:
+
+* deterministic consistency;
+* pipeline correctness;
+* reproducibility;
+* behavior of the Hybrid architecture;
+* performance against the current annotation benchmark.
+
+They do not establish production-level semantic extraction accuracy.
 
 ---
 
-# Suggested Future Work
+# 27. Hybrid Error Analysis
 
-The following items are **future improvements**, not requirements of the completed Phase 2 implementation.
-
-## Extensible Domain-Specific Metadata
-
-`SearchResultData` currently contains a small set of common metadata fields.
-
-A future version could add an optional flexible metadata dictionary:
-
-```python
-metadata: dict[str, Any]
-```
-
-This would allow the retrieval layer to preserve domain-specific information without repeatedly changing the core schema.
-
-For example, a financial document could contain:
-
-```python
-metadata = {
-    "document_type": "payroll_report",
-    "employee_id": "EMP-1042",
-    "department": "Engineering",
-    "position": "ML Engineer",
-    "pay_period": "2026-07",
-    "salary": 4200.00,
-    "currency": "USD",
-    "bonus": 500.00,
-    "tax": 630.00,
-    "net_salary": 4070.00,
-    "payment_date": "2026-07-31",
-}
-```
-
-An invoice could instead contain:
-
-```python
-metadata = {
-    "document_type": "invoice",
-    "invoice_number": "INV-2026-1042",
-    "vendor": "Example Corp",
-    "invoice_date": "2026-07-15",
-    "due_date": "2026-08-15",
-    "total": 5500.00,
-    "currency": "USD",
-}
-```
-
-This would allow the core retrieval system to remain generic while supporting richer downstream filtering, context construction, and RAG applications.
-
-## Advanced Retrieval
-
-Future retrieval improvements could include:
-
-* Metadata filtering
-* Hybrid search
-* Reranking
-* Query expansion
-* More extensive retrieval evaluation
-
-## Answer Generation
-
-A later stage can connect the generated context to an LLM:
+The final Hybrid evaluation produced mathematical errors in:
 
 ```text
-User Query
-    ↓
-Retriever
-    ↓
-Top-K Relevant Chunks
-    ↓
-ContextBuilder
-    ↓
-Prompt
-    ↓
-LLM
-    ↓
-Grounded Answer
+16 chunks
 ```
 
-The LLM generation stage is deliberately outside the completed Phase 2 implementation.
+The analysis examined:
+
+* expected entities;
+* predicted entities;
+* false negatives;
+* false positives;
+* labels;
+* character offsets;
+* confidence scores;
+* source context.
+
+Several recurring error patterns were identified.
 
 ---
 
-# Development Principles
+## 27.1 NER False Positives
 
-The Phase 2 implementation follows the same engineering principles established in Phase 1:
+The NER component frequently identifies geographic or organizational expressions that are absent from the current annotation dataset.
 
-* **Modularity** — retrieval, context construction, and orchestration remain separate.
-* **Separation of Concerns** — each component has a focused responsibility.
-* **Dependency Injection** — components receive their dependencies rather than constructing them internally.
-* **Testability** — individual components are tested with mocks while the complete flow is tested with real data.
-* **Reuse** — Phase 2 builds on the existing Phase 1 retrieval infrastructure.
-* **Avoid Premature Complexity** — LLM generation and advanced retrieval features are deferred until they are required.
-
----
-
-# Phase 2 Summary
-
-Phase 2 adds the RAG retrieval and context layer on top of the Phase 1 foundation.
-
-The completed architecture is:
+Examples include:
 
 ```text
-Documents
-   ↓
-Phase 1 Processing
-   ↓
-Embeddings
-   ↓
-ChromaDB
-   ↓
-Retriever
-   ↓
-Top-K Relevant Chunks
-   ↓
-ContextBuilder
-   ↓
-RAGChain
-   ↓
-Grounded Context
+United States → LOCATION
+Ireland       → LOCATION
+Singapore     → LOCATION
+Japan         → LOCATION
+India         → LOCATION
+Australia     → LOCATION
+Europe        → LOCATION
 ```
 
-The Phase 2 components have been tested independently and the complete retrieval-to-context flow has been verified against real project data.
+Some of these predictions are clearly meaningful entities in the source text.
 
-Phase 2 therefore provides a clean foundation for a future answer-generation stage while keeping the current implementation focused and maintainable.
+However, because they are absent from the current annotations, strict evaluation counts them as false positives.
+
+This demonstrates that the current annotation dataset is more conservative than the output of a general-purpose NER model.
 
 ---
 
-# License
+## 27.2 Boundary and Type Differences
 
-This project is developed for educational and portfolio purposes.
+The NER model sometimes identifies a broader expression than the annotation or assigns a different entity type.
+
+Examples observed during analysis include:
+
+```text
+Gold:       Xbox → PRODUCT
+Prediction: xbox live → ORGANIZATION
+```
+
+```text
+Gold:       Office → PRODUCT
+Prediction: office 365 → ORGANIZATION
+```
+
+```text
+Gold:       Microsoft → ORGANIZATION
+Prediction: microsoft news → ORGANIZATION
+```
+
+These represent strict evaluation mismatches involving:
+
+* entity boundaries;
+* entity granularity;
+* entity types;
+* differences between annotation policy and model behavior.
+
+---
+
+## 27.3 Tokenization Artifacts
+
+The NER model sometimes produces subword fragments instead of complete entities.
+
+Examples observed include:
+
+```text
+cop   → ORGANIZATION
+##ilo → ORGANIZATION
+```
+
+where the intended entity is:
+
+```text
+Copilot
+```
+
+Other fragmented predictions included:
+
+```text
+fa
+##sb
+```
+
+These examples demonstrate that NER output may require post-processing before being treated as final document entities.
+
+---
+
+## 27.4 Low-Confidence Spurious Predictions
+
+Several suspicious predictions had relatively low model confidence.
+
+Examples include:
+
+```text
+x                → ORGANIZATION   0.5190
+outlook.         → ORGANIZATION   0.5417
+i                → ORGANIZATION   0.6438
+financial review → ORGANIZATION   0.8056
+```
+
+This suggests that confidence filtering could potentially reduce some false positives.
+
+However, no confidence threshold should be selected based only on a few examples. If confidence filtering is introduced later, it should be evaluated systematically on an independently verified dataset.
+
+---
+
+# 28. Hybrid False Negatives
+
+Only:
+
+```text
+2 false negatives
+```
+
+remained in the final Hybrid result.
+
+These represent cases where the deterministic rules did not recover an expected entity and the NER model also failed to identify it.
+
+Examples include missing structured entities such as:
+
+```text
+2010 → DATE
+```
+
+The small number of remaining false negatives demonstrates the primary strength of the Hybrid architecture: deterministic extraction preserves coverage for structured entities while NER adds contextual predictions.
+
+---
+
+# 29. Important Finding: Annotation Coverage
+
+One of the most important findings of Phase 2 is that a mathematical false positive does not necessarily represent a semantically incorrect prediction.
+
+A clear example is **CHUNK 5882**.
+
+The chunk contains numerous explicit geographic references, including:
+
+```text
+Ireland
+Singapore
+Japan
+India
+Greater China
+Asia-Pacific
+Fargo
+North Dakota
+Fort Lauderdale
+Florida
+Puerto Rico
+Redmond
+Washington
+Reno
+Nevada
+Latin America
+North America
+Americas
+Australia
+Europe
+Asia
+```
+
+However, the gold annotation for this chunk contains:
+
+```text
+GOLD / EXPECTED:
+
+None
+```
+
+The Hybrid extractor predicted multiple `LOCATION` entities corresponding to these geographic expressions.
+
+Under strict evaluation, these predictions are counted as false positives.
+
+However, the predictions are supported by the actual source text and are therefore semantically meaningful geographic entities.
+
+This demonstrates an important limitation of evaluating extraction against an incomplete or non-exhaustive annotation set:
+
+```text
+Evaluation FP
+      ≠
+necessarily semantic model error
+```
+
+A prediction can be semantically valid while still being classified as a false positive if the corresponding entity is missing from the gold annotations.
+
+This is particularly important for the Hybrid extractor because one of its purposes is to increase entity coverage through contextual NER.
+
+Consequently, additional valid entities can reduce strict precision when those entities are not represented in the available annotations.
+
+The current dataset should therefore be treated as an **evaluation benchmark with limited annotation coverage**, rather than an exhaustive representation of every valid entity appearing in the source documents.
+
+---
+
+# 30. NER Error-Analysis Framework
+
+A separate error-analysis framework was developed to investigate the causes behind mathematical evaluation mismatches.
+
+Relevant categories include:
+
+```text
+VALID_UNANNOTATED
+WRONG_ENTITY
+WRONG_LABEL
+BOUNDARY_ERROR
+TOKENIZATION_ERROR
+ANNOTATION_PROBLEM
+SEMANTICALLY_VALID
+OTHER
+```
+
+This analysis does not replace the official evaluation.
+
+The two levels serve different purposes:
+
+```text
+Official Evaluation
+        ↓
+Precision / Recall / F1
+```
+
+and:
+
+```text
+Error Analysis
+        ↓
+Why did the mismatch occur?
+```
+
+The official metrics remain the primary quantitative benchmark.
+
+The error analysis is diagnostic and is intended to reveal whether a mathematical mismatch represents a genuine extraction problem, an annotation limitation, or an output-processing issue.
+
+---
+
+# 31. Semantic Acceptance Rate
+
+The error-analysis framework also defines a diagnostic metric called:
+
+```text
+Semantic Acceptance Rate
+```
+
+Conceptually:
+
+```text
+Semantically acceptable apparent errors
+-------------------------------------- × 100
+All evaluated apparent errors
+```
+
+The metric asks:
+
+> When a prediction does not exactly match the annotation, how often is it nevertheless semantically meaningful?
+
+This metric must not be interpreted as:
+
+* model accuracy;
+* precision;
+* recall;
+* F1.
+
+It should only be reported when the relevant apparent errors have been manually classified sufficiently to support the calculation.
+
+For the current Phase 2 report, the official Hybrid metrics remain the primary quantitative result.
+
+---
+
+# 32. Phase 2 Architecture
+
+The final extraction architecture is:
+
+```text
+                    Document Chunks
+                           │
+                           ▼
+                    EntityExtractor
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+              ▼                         ▼
+      AutomaticAnnotator             NERModel
+              │                         │
+       ┌──────┴──────┐                  │
+       │             │                  │
+     Regex       Dictionaries           │
+       │             │                  │
+       └──────┬──────┘                  │
+              │                         │
+              └────────────┬────────────┘
+                           ▼
+                   Entity Merging
+                           │
+                           ▼
+                   ExtractedEntity
+                           │
+                           ▼
+                 predictions.jsonl
+                           │
+                           ▼
+                      Evaluation
+                           │
+                           ▼
+                     Error Analysis
+```
+
+The architecture separates:
+
+* deterministic extraction;
+* contextual NER;
+* duplicate handling;
+* overlap resolution;
+* structured prediction output;
+* evaluation;
+* error analysis.
+
+This provides a clean interface for future improvements.
+
+---
+
+# 33. Phase 2 Implementation Status
+
+The following components are complete:
+
+```text
+✓ Entity schema
+✓ Annotation guidelines
+✓ ChromaDB sampling
+✓ Deterministic sampling
+✓ Weak annotation rules
+✓ Regex extraction
+✓ Dictionary extraction
+✓ Automatic annotation
+✓ Annotation dataset generation
+✓ Dataset validation
+✓ Dataset analysis
+✓ Train/validation/test splitting
+✓ Reusable entity evaluator
+✓ Precision / Recall / F1 calculation
+✓ Per-label evaluation
+✓ NER baseline
+✓ NER label mapping
+✓ Confidence preservation
+✓ Context preservation
+✓ NER candidate comparison
+✓ Hybrid EntityExtractor
+✓ Entity merging
+✓ Duplicate handling
+✓ Overlap handling
+✓ Rule-based priority
+✓ End-to-end extraction pipeline
+✓ JSONL prediction output
+✓ Rule-based vs NER vs Hybrid evaluation
+✓ Chunk-level Hybrid error analysis
+✓ NER error analysis
+```
+
+---
+
+# 34. What Is Not Considered Finished
+
+The following are intentionally **not considered production-quality completed components**.
+
+## 34.1 Human-Verified Gold Dataset
+
+The current annotations are weak annotations.
+
+A smaller independently verified dataset would be required for a reliable measurement of semantic extraction quality.
+
+## 34.2 Final NER Model
+
+`musk1209/finsight-ner` is the selected baseline for the current Hybrid evaluation.
+
+It is not claimed to be the final or optimal NER model for IDA.
+
+## 34.3 Complete Entity Schema Coverage
+
+The broader IDA schema still contains categories such as:
+
+```text
+NUMBER
+FINANCIAL_METRIC
+DOCUMENT_REFERENCE
+```
+
+that are not comprehensively implemented by the current deterministic extraction system.
+
+## 34.4 Production-Level Accuracy Benchmark
+
+The current benchmark is based on weak annotations and limited annotation coverage.
+
+Therefore, it should not be presented as a final measurement of real-world extraction accuracy.
+
+---
+
+# 35. Recommended Future Work
+
+Phase 2 should not be expanded indefinitely.
+
+The current implementation provides sufficient infrastructure to move forward with the project.
+
+Future improvements should be driven by actual requirements and stronger evaluation data.
+
+The most useful next steps are:
+
+1. Create a small independently verified gold-standard dataset.
+2. Re-evaluate the current NER candidates against that dataset.
+3. Add targeted post-processing for obvious NER artifacts.
+4. Evaluate confidence filtering only if independently justified.
+5. Expand deterministic rules when concrete extraction requirements appear.
+6. Fine-tune a domain-specific NER model only if later requirements justify it.
+7. Revisit semantic error analysis when better annotations are available.
+
+There is no need to exhaustively test every theoretical entity pattern at this stage.
+
+The goal of Phase 2 is to establish a maintainable extraction foundation, not to turn the project into an open-ended NER research project.
+
+---
+
+# 36. Phase 2 Final Assessment
+
+Phase 2 successfully established the annotation and entity-extraction foundation for IDA.
+
+The system now provides:
+
+```text
+Structured Entity Schema
+        ↓
+Reproducible Annotation Dataset
+        ↓
+Validation and Analysis
+        ↓
+Train / Validation / Test Splits
+        ↓
+NER Baseline
+        ↓
+Hybrid Extraction
+        ↓
+Structured Predictions
+        ↓
+Quantitative Evaluation
+        ↓
+Error Analysis
+```
+
+The main quantitative result of the current Hybrid system is:
+
+```text
+TP:        116
+FP:         44
+FN:          2
+
+Precision:  72.50%
+Recall:     98.31%
+F1:         83.45%
+```
+
+The result demonstrates that the Hybrid architecture provides very high recall on the current evaluation benchmark.
+
+Its primary weakness is over-extraction from the NER component, which increases the number of strict false positives.
+
+At the same time, the evaluation has two important limitations:
+
+1. The expected entities were generated through deterministic annotation rules.
+2. The annotations are not exhaustive human-verified ground truth.
+
+Therefore, the current metrics should be interpreted as **performance against the available Phase 2 benchmark**, rather than production-level semantic extraction accuracy.
+
+---
+
+# 37. Final Conclusion
+
+The main achievement of Phase 2 is not a particular F1 score.
+
+The main achievement is the establishment of a complete and reproducible entity-extraction architecture that can now be improved without redesigning the entire system.
+
+The current design combines:
+
+```text
+Deterministic Rules
+    ↓
+Structured / domain-specific entities
+
+Dictionaries
+    ↓
+Known organizations and products
+
+NER
+    ↓
+Contextual entities
+
+EntityExtractor
+    ↓
+Unified structured output
+
+Evaluator
+    ↓
+Quantitative measurement
+
+Error Analysis
+    ↓
+Diagnosis of evaluation mismatches
+```
+
+This provides IDA with a practical extraction baseline and a clear path for future improvements.
+
+Most importantly, Phase 2 has reached the point where further work should be driven by actual requirements and independently verified evaluation data rather than by continuously expanding the test suite or adding unnecessary complexity.
+
+**Phase 2 is therefore considered complete as a baseline annotation and entity-extraction implementation.**
