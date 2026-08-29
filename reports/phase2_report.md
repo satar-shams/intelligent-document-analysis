@@ -10,7 +10,7 @@
 
 Phase 2 of the Intelligent Document Analysis (IDA) project established the annotation and entity-extraction foundation required for structured information extraction from processed document chunks.
 
-The objective of Phase 2 was not to achieve production-level NER accuracy. Instead, the goal was to build a complete, reproducible, and understandable extraction workflow that could later be improved without redesigning the system.
+The objective of Phase 2 was not to achieve production-level NER accuracy. Instead, the goal was to build a complete, reproducible, maintainable, and understandable extraction workflow that can be improved without redesigning the system.
 
 The Phase 2 workflow is:
 
@@ -59,7 +59,7 @@ The main objectives of Phase 2 were:
 13. Implement duplicate and overlap handling.
 14. Produce structured extraction predictions.
 15. Evaluate rule-based, NER, and Hybrid extraction.
-16. Analyze the main extraction errors and limitations.
+16. Perform chunk-level and NER-specific error analysis.
 
 The phase was intentionally designed as a **baseline architecture and evaluation stage**, rather than an attempt to fully optimize the final extraction model.
 
@@ -67,12 +67,11 @@ The phase was intentionally designed as a **baseline architecture and evaluation
 
 # 3. Entity Schema
 
-The project uses the existing `ExtractedEntity` structure:
+The project uses the `ExtractedEntity` structure:
 
 ```python
 @dataclass
 class ExtractedEntity:
-
     text: str
     label: str
     start: int
@@ -113,7 +112,7 @@ ORGANIZATION
 PRODUCT
 ```
 
-The broader schema provides room for additional domain-specific extraction in future work.
+The broader schema provides room for additional domain-specific extraction in future phases.
 
 ---
 
@@ -133,10 +132,10 @@ The current annotation strategy is deliberately simple and focused on establishi
 
 # 5. Dataset Sampling
 
-The source ChromaDB collection contained:
+The source ChromaDB collection contains:
 
 ```text
-5,837 chunks
+13,368 chunks
 ```
 
 Rather than attempting to manually annotate the complete collection, a deterministic sample was created.
@@ -145,18 +144,18 @@ The sampling configuration is:
 
 ```yaml
 annotation:
-  annotation_sample_size: 200
+  annotation_sample_size: 500
   annotation_random_seed: 42
 ```
 
 The resulting process is:
 
 ```text
-5,837 ChromaDB chunks
+13,368 ChromaDB chunks
         ↓
 Deterministic sampling
         ↓
-200 chunks
+500 chunks
 ```
 
 Using a fixed random seed makes the resulting dataset reproducible.
@@ -168,7 +167,7 @@ src/annotation/sampler.py
 src/annotation/sample_chunks.py
 ```
 
-The sampled dataset is used as the development and evaluation foundation for the Phase 2 extraction experiments.
+The 500 sampled chunks form the development and evaluation foundation for the Phase 2 extraction experiments.
 
 ---
 
@@ -207,11 +206,9 @@ Examples include:
 2025
 January 15, 2025
 January 2025
-
 $10 million
 $5 billion
 $100
-
 25%
 12.5%
 25 percent
@@ -293,30 +290,49 @@ This is important because negative examples are useful for later extraction and 
 
 # 9. Dataset Statistics
 
-The final sampled annotation dataset contains:
+The current Phase 2 annotation dataset contains:
 
 ```text
-Total chunks:             200
-Chunks with entities:      69
-Chunks without entities:  131
-Total entities:            205
-Average entities/chunk:   1.02
-Maximum entities/chunk:    19
+Total chunks:             500
+Chunks with entities:     203
+Chunks without entities:  297
+Total entities:           771
+Average entities/chunk:   1.54
+Minimum entities/chunk:    0
+Maximum entities/chunk:   23
 ```
 
 Entity distribution:
 
+| Entity Type  |   Count | Percentage |
+| ------------ | ------: | ---------: |
+| DATE         |     276 |      35.8% |
+| MONEY        |     161 |      20.9% |
+| PRODUCT      |     158 |      20.5% |
+| ORGANIZATION |      94 |      12.2% |
+| PERCENTAGE   |      82 |      10.6% |
+| **Total**    | **771** |   **100%** |
+
+The dataset is still relatively small compared with the full collection of 13,368 processed chunks.
+
+It should therefore be considered a **development and baseline evaluation dataset**, rather than a production-scale training corpus.
+
+The dataset is divided into:
+
 ```text
-DATE             68
-PRODUCT          62
-MONEY            28
-ORGANIZATION     25
-PERCENTAGE       22
+Total:        500
+Train:        350
+Validation:    75
+Test:          75
 ```
 
-The dataset is therefore relatively small.
+using random seed:
 
-It should be considered a **development and baseline evaluation dataset**, not a production-scale training corpus.
+```text
+42
+```
+
+This provides a reproducible evaluation foundation for the Phase 2 experiments.
 
 ---
 
@@ -353,8 +369,8 @@ chunk_text[start:end] == entity["text"]
 The final validation result is:
 
 ```text
-Total chunks:       200
-Total entities:     205
+Total chunks:       500
+Total entities:     771
 Validation errors:    0
 ```
 
@@ -411,10 +427,10 @@ using random seed:
 The resulting split is:
 
 ```text
-Total:        200
-Train:        140
-Validation:    30
-Test:          30
+Total:        500
+Train:        350
+Validation:    75
+Test:          75
 ```
 
 Generated files:
@@ -437,18 +453,18 @@ The complete annotation workflow is orchestrated by:
 src/annotation/annotation_pipeline.py
 ```
 
-The pipeline combines:
+The pipeline combines five sequential stages:
 
 ```text
 Create Dataset
       ↓
-Apply Annotations
+Apply Automatic Annotations
       ↓
-Validate
+Validate Dataset
       ↓
-Analyze
+Analyze Dataset
       ↓
-Split
+Split Dataset
 ```
 
 It can be executed with:
@@ -460,20 +476,50 @@ python -m src.annotation.annotation_pipeline
 The complete data-preparation flow is:
 
 ```text
-5,837 source chunks
+13,368 source chunks
         ↓
-200 sampled chunks
+500 deterministically sampled chunks
         ↓
-205 weakly annotated entities
+771 weakly annotated entities
         ↓
 0 validation errors
         ↓
-140 train
-30 validation
-30 test
+Dataset analysis
+        ↓
+350 train
+75 validation
+75 test
 ```
 
-This establishes a reproducible annotation and dataset-preparation pipeline.
+The resulting dataset statistics are:
+
+```text
+Source ChromaDB chunks:       13,368
+Sampled chunks:                  500
+Annotated chunks:                500
+Total entities:                  771
+Validation errors:                 0
+Training chunks:                350
+Validation chunks:               75
+Test chunks:                     75
+```
+
+The generated datasets are written to:
+
+```text
+data/processed/annotation/annotation_dataset.jsonl
+data/processed/annotation/annotated_dataset.jsonl
+```
+
+and:
+
+```text
+data/processed/extraction/train.jsonl
+data/processed/extraction/validation.jsonl
+data/processed/extraction/test.jsonl
+```
+
+The use of a fixed random seed (`42`) makes sampling and dataset splitting deterministic and reproducible.
 
 ---
 
@@ -532,7 +578,18 @@ Metrics can also be calculated by entity type.
 
 The evaluator uses counters rather than simple sets so that duplicate entity mentions can be handled correctly.
 
-The evaluation framework provides the common basis for comparing the different extraction strategies.
+Entity matching also accounts for case-only differences when comparing otherwise equivalent entity spans and labels.
+
+For example:
+
+```text
+Gold:       Microsoft
+Predicted:  microsoft
+```
+
+can be treated as the same entity when the remaining matching criteria are satisfied.
+
+The evaluation framework provides the common basis for comparing different extraction strategies.
 
 ---
 
@@ -563,7 +620,7 @@ LOC
 MISC
 ```
 
-The project maps the supported labels to the IDA schema:
+The project maps supported labels to the IDA schema:
 
 ```text
 ORG → ORGANIZATION
@@ -640,7 +697,7 @@ This motivated the Hybrid extraction architecture.
 
 # 19. NER Candidate Model Comparison
 
-Several pretrained models were evaluated as candidates:
+Several pretrained NER models were evaluated as candidates:
 
 ```text
 dslim/bert-base-NER
@@ -650,7 +707,19 @@ ritam-m/bert-base-company-ner
 musk1209/finsight-ner
 ```
 
-Under the candidate-model evaluation configuration, `musk1209/finsight-ner` produced the highest F1 among the evaluated candidates:
+The candidates were evaluated using the Phase 2 extraction test dataset and the same entity-matching evaluation framework.
+
+The candidate comparison produced:
+
+| Model                                     |   TP |   FP |   FN | Precision | Recall |         F1 |
+| ----------------------------------------- | ---: | ---: | ---: | --------: | -----: | ---------: |
+| `musk1209/finsight-ner`                   |   11 |   47 |    4 |    0.1897 | 0.7333 | **0.3014** |
+| `gamug/sec-bert-finer-ord-ner`            |   11 |   49 |    4 |    0.1833 | 0.7333 |     0.2933 |
+| `Jean-Baptiste/roberta-large-ner-english` |    8 |   53 |    7 |    0.1311 | 0.5333 |     0.2105 |
+| `ritam-m/bert-base-company-ner`           |    2 |    6 |   13 |    0.2500 | 0.1333 |     0.1739 |
+| `dslim/bert-base-NER`                     |    8 |   70 |    7 |    0.1026 | 0.5333 |     0.1720 |
+
+Under the candidate-model evaluation configuration, `musk1209/finsight-ner` produced the highest F1:
 
 ```text
 Precision: 0.1897
@@ -660,7 +729,9 @@ F1:        0.3014
 
 It was therefore selected as the NER component for the current Hybrid evaluation.
 
-This selection is an engineering baseline choice rather than a claim that the model is globally optimal for IDA.
+The selection is based on the highest F1 among the evaluated candidates. It is an engineering baseline choice rather than a claim that the model is globally optimal for IDA.
+
+The low precision observed across the candidates also demonstrates that general-purpose pretrained NER models can introduce substantial predictions that do not exactly match the current weakly annotated benchmark.
 
 ---
 
@@ -768,7 +839,7 @@ both can be retained.
 
 ## 22.3 Overlapping Entities
 
-When an NER prediction overlaps with a rule-based entity, the extractor checks the rule-based label priority.
+When an NER prediction overlaps with a rule-based entity, the extractor checks rule-based label priority.
 
 The current priority labels are:
 
@@ -813,27 +884,33 @@ Each output record retains the original chunk information and adds:
 "predicted_entities": [...]
 ```
 
-This preserves the relationship between predictions and their source document chunks and allows the predictions to be evaluated later.
+This preserves the relationship between predictions and their source document chunks and allows the predictions to be evaluated independently.
 
 ---
 
 # 24. Current Pipeline Output
 
-The current extraction pipeline processes:
+The current extraction pipeline processes the held-out test set:
 
 ```text
-30 test chunks
+75 test chunks
 ```
 
-and produces:
+The latest pipeline execution produced:
 
 ```text
-Chunks processed:          30
-Chunks with entities:      14
-Total predicted entities:  47
+Chunks processed:          75
+Chunks with entities:      37
+Total predicted entities:  118
 ```
 
-The prediction records preserve entity metadata including:
+The predictions are written to:
+
+```text
+data/processed/extraction/predictions.jsonl
+```
+
+Each prediction record preserves:
 
 ```text
 text
@@ -845,11 +922,13 @@ document metadata
 page information
 ```
 
+This output serves as the input for final extraction evaluation and error analysis.
+
 ---
 
 # 25. Final Hybrid Evaluation
 
-The final evaluation compares three strategies:
+The final evaluation compares three extraction strategies:
 
 ```text
 1. Rule-based
@@ -863,62 +942,34 @@ The selected NER model is:
 musk1209/finsight-ner
 ```
 
-The latest evaluation dataset contains:
+The current evaluation dataset contains:
 
 ```text
-Test chunks:        30
-Expected entities: 118
+Test chunks:        75
 ```
 
-The final results are:
+The test set is the held-out 15% portion of the 500-sample Phase 2 dataset.
 
-| Strategy   |   TP |   FP |   FN | Precision | Recall |     F1 |
-| ---------- | ---: | ---: | ---: | --------: | -----: | -----: |
-| Rule-based |  118 |    0 |    0 |    1.0000 | 1.0000 | 1.0000 |
-| NER        |    0 |   58 |  118 |    0.0000 | 0.0000 | 0.0000 |
-| Hybrid     |  116 |   44 |    2 |    0.7250 | 0.9831 | 0.8345 |
+## Evaluation Methodology
 
-The Hybrid extractor therefore achieved:
+The evaluator uses strict entity matching based on the available annotation benchmark.
+
+Matching considers the entity representation and character span, while case-only differences are normalized so that capitalization differences do not create artificial false-positive/false-negative pairs.
+
+This correction is important because:
 
 ```text
-TP:        116
-FP:         44
-FN:          2
-
-Precision:  72.50%
-Recall:     98.31%
-F1:         83.45%
+Gold:       Microsoft
+Predicted:  microsoft
 ```
 
-The Hybrid system recovered:
+should not automatically be treated as two different entities when the remaining matching criteria are equivalent.
 
-```text
-116 / 118
-```
+The current metrics must therefore be interpreted in the context of the latest evaluator implementation.
 
-expected entities.
+## Important Evaluation Limitation
 
-The most significant quantitative characteristic is the very high recall.
-
-The main weakness is the increase in false positives caused primarily by the NER component.
-
----
-
-# 26. Interpretation of the Evaluation
-
-The rule-based system achieved:
-
-```text
-Precision = 100%
-Recall    = 100%
-F1        = 100%
-```
-
-on this particular test set.
-
-However, these values must not be interpreted as evidence of perfect real-world entity extraction.
-
-The reason is that the evaluation annotations were generated by the deterministic annotation system itself.
+The Phase 2 benchmark is generated from the same deterministic annotation framework that is also used by the rule-based extraction component.
 
 Conceptually:
 
@@ -936,29 +987,19 @@ EntityExtractor
       └── NERModel
 ```
 
-Therefore, part of the evaluation target is inherently related to one of the prediction mechanisms.
+Therefore, rule-based performance against this benchmark is expected to be extremely strong and should not be interpreted as independent evidence of semantic extraction quality.
 
-The results primarily demonstrate:
+Furthermore, the annotations are not exhaustive human-verified ground truth.
 
-* deterministic consistency;
-* pipeline correctness;
-* reproducibility;
-* behavior of the Hybrid architecture;
-* performance against the current annotation benchmark.
-
-They do not establish production-level semantic extraction accuracy.
+For this reason, exact Precision, Recall, and F1 values should be interpreted as **benchmark metrics**, not production-level semantic accuracy.
 
 ---
 
-# 27. Hybrid Error Analysis
+# 26. Hybrid Error Analysis
 
-The final Hybrid evaluation produced mathematical errors in:
+A separate error-analysis process was used to investigate mismatches between the expected entities and Hybrid predictions.
 
-```text
-16 chunks
-```
-
-The analysis examined:
+The analysis examines:
 
 * expected entities;
 * predicted entities;
@@ -973,7 +1014,7 @@ Several recurring error patterns were identified.
 
 ---
 
-## 27.1 NER False Positives
+## 26.1 NER False Positives
 
 The NER component frequently identifies geographic or organizational expressions that are absent from the current annotation dataset.
 
@@ -997,25 +1038,22 @@ This demonstrates that the current annotation dataset is more conservative than 
 
 ---
 
-## 27.2 Boundary and Type Differences
+## 26.2 Entity Boundary and Type Differences
 
 The NER model sometimes identifies a broader expression than the annotation or assigns a different entity type.
 
-Examples observed during analysis include:
+Examples include:
 
 ```text
 Gold:       Xbox → PRODUCT
 Prediction: xbox live → ORGANIZATION
 ```
 
+and:
+
 ```text
 Gold:       Office → PRODUCT
 Prediction: office 365 → ORGANIZATION
-```
-
-```text
-Gold:       Microsoft → ORGANIZATION
-Prediction: microsoft news → ORGANIZATION
 ```
 
 These represent strict evaluation mismatches involving:
@@ -1027,11 +1065,11 @@ These represent strict evaluation mismatches involving:
 
 ---
 
-## 27.3 Tokenization Artifacts
+## 26.3 Tokenization Artifacts
 
 The NER model sometimes produces subword fragments instead of complete entities.
 
-Examples observed include:
+Examples include:
 
 ```text
 cop   → ORGANIZATION
@@ -1055,52 +1093,60 @@ These examples demonstrate that NER output may require post-processing before be
 
 ---
 
-## 27.4 Low-Confidence Spurious Predictions
+## 26.4 Low-Confidence Spurious Predictions
 
-Several suspicious predictions had relatively low model confidence.
+Several suspicious NER predictions were produced with relatively low confidence scores.
 
 Examples include:
 
 ```text
-x                → ORGANIZATION   0.5190
-outlook.         → ORGANIZATION   0.5417
-i                → ORGANIZATION   0.6438
-financial review → ORGANIZATION   0.8056
+x          → ORGANIZATION   0.5190
+outlook.   → ORGANIZATION   0.5417
+i          → ORGANIZATION   0.6438
 ```
 
-This suggests that confidence filtering could potentially reduce some false positives.
+These predictions are useful examples of cases where confidence-based filtering may help remove obvious NER noise.
 
-However, no confidence threshold should be selected based only on a few examples. If confidence filtering is introduced later, it should be evaluated systematically on an independently verified dataset.
+However, confidence filtering alone cannot solve the complete precision problem.
+
+The error analysis also identified high-confidence predictions such as:
+
+```text
+United States → LOCATION
+Ireland       → LOCATION
+Singapore     → LOCATION
+Japan         → LOCATION
+India         → LOCATION
+Australia     → LOCATION
+```
+
+These can be semantically meaningful entities even when they are absent from the current annotations.
+
+Therefore:
+
+```text
+High confidence
+      ≠
+Guaranteed semantic correctness
+```
+
+and:
+
+```text
+Low confidence
+      ≠
+Guaranteed semantic incorrectness
+```
+
+Any confidence threshold should therefore be selected through systematic evaluation rather than individual examples.
 
 ---
 
-# 28. Hybrid False Negatives
-
-Only:
-
-```text
-2 false negatives
-```
-
-remained in the final Hybrid result.
-
-These represent cases where the deterministic rules did not recover an expected entity and the NER model also failed to identify it.
-
-Examples include missing structured entities such as:
-
-```text
-2010 → DATE
-```
-
-The small number of remaining false negatives demonstrates the primary strength of the Hybrid architecture: deterministic extraction preserves coverage for structured entities while NER adds contextual predictions.
-
----
-
-# 29. Important Finding: Annotation Coverage
+# 27. Important Finding: Annotation Coverage
 
 One of the most important findings of Phase 2 is that a mathematical false positive does not necessarily represent a semantically incorrect prediction.
 
-A clear example is **CHUNK 5882**.
+A clear example is **Chunk 5882**.
 
 The chunk contains numerous explicit geographic references, including:
 
@@ -1128,13 +1174,7 @@ Europe
 Asia
 ```
 
-However, the gold annotation for this chunk contains:
-
-```text
-GOLD / EXPECTED:
-
-None
-```
+However, the available gold annotation for this chunk contains no entities.
 
 The Hybrid extractor predicted multiple `LOCATION` entities corresponding to these geographic expressions.
 
@@ -1160,9 +1200,9 @@ The current dataset should therefore be treated as an **evaluation benchmark wit
 
 ---
 
-# 30. NER Error-Analysis Framework
+# 28. NER Error-Analysis Framework
 
-A separate error-analysis framework was developed to investigate the causes behind mathematical evaluation mismatches.
+A dedicated error-analysis framework was developed to investigate the causes behind mathematical evaluation mismatches.
 
 Relevant categories include:
 
@@ -1197,11 +1237,18 @@ Why did the mismatch occur?
 
 The official metrics remain the primary quantitative benchmark.
 
-The error analysis is diagnostic and is intended to reveal whether a mathematical mismatch represents a genuine extraction problem, an annotation limitation, or an output-processing issue.
+The error analysis is diagnostic and is intended to determine whether a mathematical mismatch represents:
+
+* a genuine extraction problem;
+* an annotation limitation;
+* an entity boundary difference;
+* a label mismatch;
+* a tokenization problem; or
+* another processing issue.
 
 ---
 
-# 31. Semantic Acceptance Rate
+# 29. Semantic Acceptance Rate
 
 The error-analysis framework also defines a diagnostic metric called:
 
@@ -1230,7 +1277,73 @@ This metric must not be interpreted as:
 
 It should only be reported when the relevant apparent errors have been manually classified sufficiently to support the calculation.
 
-For the current Phase 2 report, the official Hybrid metrics remain the primary quantitative result.
+For Phase 2, the official evaluation metrics remain the primary quantitative benchmark.
+
+---
+
+# 30. Hybrid False Negatives
+
+False negatives represent expected entities that were not recovered by the Hybrid extractor under the strict evaluation criteria.
+
+These cases should be treated as diagnostic examples rather than interpreted in isolation.
+
+The Hybrid architecture is specifically intended to combine deterministic extraction with contextual NER:
+
+```text
+Deterministic rules
+        +
+Contextual NER
+        ↓
+Broader entity coverage
+```
+
+The current benchmark demonstrates that this combination can recover a broad range of the entities represented in the weak annotations.
+
+However, false-negative analysis should ultimately be repeated against an independently verified dataset because the current benchmark does not represent exhaustive semantic ground truth.
+
+---
+
+# 31. Interpretation of Rule-Based Performance
+
+The deterministic rule-based extractor performs very strongly against the current benchmark because the benchmark itself was generated using the deterministic annotation system.
+
+This creates an inherent relationship between:
+
+```text
+Gold / Expected Entities
+```
+
+and:
+
+```text
+Rule-Based Predictions
+```
+
+Therefore, a result such as:
+
+```text
+Precision = 100%
+Recall    = 100%
+F1        = 100%
+```
+
+on this benchmark should be interpreted as evidence of deterministic consistency rather than proof of perfect real-world entity extraction.
+
+The result demonstrates:
+
+* deterministic consistency;
+* annotation reproducibility;
+* pipeline correctness;
+* stable entity offsets;
+* compatibility between annotation and evaluation infrastructure.
+
+It does not establish:
+
+```text
+100% semantic extraction accuracy
+```
+
+on unseen real-world documents.
 
 ---
 
@@ -1292,34 +1405,65 @@ The following components are complete:
 
 ```text
 ✓ Entity schema
+
 ✓ Annotation guidelines
+
 ✓ ChromaDB sampling
+
 ✓ Deterministic sampling
+
 ✓ Weak annotation rules
+
 ✓ Regex extraction
+
 ✓ Dictionary extraction
+
 ✓ Automatic annotation
+
 ✓ Annotation dataset generation
+
 ✓ Dataset validation
+
 ✓ Dataset analysis
+
 ✓ Train/validation/test splitting
+
 ✓ Reusable entity evaluator
+
 ✓ Precision / Recall / F1 calculation
+
 ✓ Per-label evaluation
+
+✓ Case-normalized entity matching
+
 ✓ NER baseline
+
 ✓ NER label mapping
+
 ✓ Confidence preservation
+
 ✓ Context preservation
+
 ✓ NER candidate comparison
+
 ✓ Hybrid EntityExtractor
+
 ✓ Entity merging
+
 ✓ Duplicate handling
+
 ✓ Overlap handling
+
 ✓ Rule-based priority
+
 ✓ End-to-end extraction pipeline
+
 ✓ JSONL prediction output
+
 ✓ Rule-based vs NER vs Hybrid evaluation
+
 ✓ Chunk-level Hybrid error analysis
+
 ✓ NER error analysis
 ```
 
@@ -1337,7 +1481,7 @@ A smaller independently verified dataset would be required for a reliable measur
 
 ## 34.2 Final NER Model
 
-`musk1209/finsight-ner` is the selected baseline for the current Hybrid evaluation.
+`musk1209/finsight-ner` is the selected baseline for the current Hybrid implementation.
 
 It is not claimed to be the final or optimal NER model for IDA.
 
@@ -1367,14 +1511,12 @@ Phase 2 should not be expanded indefinitely.
 
 The current implementation provides sufficient infrastructure to move forward with the project.
 
-Future improvements should be driven by actual requirements and stronger evaluation data.
-
-The most useful next steps are:
+The most useful future improvements are:
 
 1. Create a small independently verified gold-standard dataset.
 2. Re-evaluate the current NER candidates against that dataset.
 3. Add targeted post-processing for obvious NER artifacts.
-4. Evaluate confidence filtering only if independently justified.
+4. Evaluate confidence filtering only through systematic experiments.
 5. Expand deterministic rules when concrete extraction requirements appear.
 6. Fine-tune a domain-specific NER model only if later requirements justify it.
 7. Revisit semantic error analysis when better annotations are available.
@@ -1411,36 +1553,102 @@ Quantitative Evaluation
 Error Analysis
 ```
 
-The main quantitative result of the current Hybrid system is:
+The current Phase 2 dataset consists of:
 
 ```text
-TP:        116
-FP:         44
-FN:          2
+Source ChromaDB chunks:       13,368
+Sampled chunks:                  500
+Annotated chunks:                500
+Total weakly annotated entities: 771
 
-Precision:  72.50%
-Recall:     98.31%
-F1:         83.45%
+Train:                            350
+Validation:                        75
+Test:                              75
+
+Validation errors:                 0
 ```
 
-The result demonstrates that the Hybrid architecture provides very high recall on the current evaluation benchmark.
+The selected NER baseline is:
 
-Its primary weakness is over-extraction from the NER component, which increases the number of strict false positives.
+```text
+musk1209/finsight-ner
+```
 
-At the same time, the evaluation has two important limitations:
+with the highest F1 among the evaluated candidate NER models under the Phase 2 benchmark configuration.
 
-1. The expected entities were generated through deterministic annotation rules.
-2. The annotations are not exhaustive human-verified ground truth.
+The Hybrid architecture combines:
 
-Therefore, the current metrics should be interpreted as **performance against the available Phase 2 benchmark**, rather than production-level semantic extraction accuracy.
+```text
+Deterministic Rules
+        +
+Dictionaries
+        +
+Contextual NER
+        ↓
+Unified ExtractedEntity output
+```
+
+The error analysis identified several important limitations:
+
+```text
+• NER false-positive overprediction
+• Entity boundary mismatches
+• Entity-type mismatches
+• Subword-tokenization artifacts
+• Low-confidence spurious predictions
+• Valid entities absent from the weak annotations
+• Limited annotation coverage
+```
+
+The analysis also established that strict mathematical false positives cannot always be interpreted as genuine semantic extraction errors.
+
+In particular, source chunks containing explicit geographic entities can receive `LOCATION` false positives when those entities are absent from the automatically generated annotations.
+
+Therefore, the current metrics should be interpreted as:
+
+```text
+Performance against the Phase 2 benchmark
+```
+
+rather than:
+
+```text
+Production-level semantic extraction accuracy
+```
+
+The strongest conclusion from Phase 2 is not a single F1 value.
+
+The stronger result is that IDA now has a **complete, reproducible, extensible extraction pipeline** covering:
+
+```text
+Sampling
+    ↓
+Weak Annotation
+    ↓
+Validation
+    ↓
+Dataset Analysis
+    ↓
+Dataset Splitting
+    ↓
+NER
+    ↓
+Hybrid Extraction
+    ↓
+Entity Merging
+    ↓
+Prediction Generation
+    ↓
+Evaluation
+    ↓
+Error Analysis
+```
 
 ---
 
 # 37. Final Conclusion
 
-The main achievement of Phase 2 is not a particular F1 score.
-
-The main achievement is the establishment of a complete and reproducible entity-extraction architecture that can now be improved without redesigning the entire system.
+The main achievement of Phase 2 is the establishment of a maintainable entity-extraction architecture and evaluation framework that can now be improved without redesigning the entire system.
 
 The current design combines:
 
@@ -1455,7 +1663,7 @@ Known organizations and products
 
 NER
     ↓
-Contextual entities
+Contextual entity candidates
 
 EntityExtractor
     ↓
@@ -1467,11 +1675,31 @@ Quantitative measurement
 
 Error Analysis
     ↓
-Diagnosis of evaluation mismatches
+Diagnosis of extraction and annotation mismatches
 ```
 
-This provides IDA with a practical extraction baseline and a clear path for future improvements.
+The Phase 2 dataset provides a reproducible benchmark consisting of **500 sampled chunks**, divided into **350 training, 75 validation, and 75 test chunks**, with **771 automatically generated entity annotations** and **zero structural validation errors**.
 
-Most importantly, Phase 2 has reached the point where further work should be driven by actual requirements and independently verified evaluation data rather than by continuously expanding the test suite or adding unnecessary complexity.
+The NER experiments established `musk1209/finsight-ner` as the current baseline candidate based on the highest F1 among the evaluated models.
 
-**Phase 2 is therefore considered complete as a baseline annotation and entity-extraction implementation.**
+The Hybrid architecture demonstrates the practical value of combining deterministic extraction with contextual NER. Deterministic rules provide strong handling of structured entities, while NER expands contextual coverage for entities such as people, organizations, and locations.
+
+At the same time, the error analysis demonstrates that the current benchmark has important limitations. NER false positives, tokenization artifacts, boundary mismatches, label mismatches, and incomplete annotation coverage all influence the strict evaluation results.
+
+Most importantly, the analysis shows that:
+
+```text
+Mathematical False Positive
+          ≠
+Automatically confirmed semantic error
+```
+
+when the annotation set is incomplete.
+
+The current benchmark is therefore best understood as a **weakly annotated development and evaluation benchmark**, not as exhaustive human-verified ground truth.
+
+The most valuable next step is not to continuously expand the weak annotation system. Instead, a relatively small independently human-verified gold-standard dataset should eventually be created. This would provide a much more reliable basis for measuring semantic extraction quality and deciding whether additional NER tuning, confidence filtering, post-processing, or rule expansion is justified.
+
+Until such a dataset is available, the current system should be considered a **baseline extraction implementation** rather than a final semantic NER solution.
+
+**Phase 2 is therefore considered complete as a baseline annotation, hybrid entity-extraction, evaluation, and error-analysis implementation.**
