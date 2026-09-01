@@ -8,8 +8,10 @@ __pycache__/
 venv/
 env/
 
-# Environment variables
+# Environment variables / secrets
 .env
+.env.*
+!.env.example
 
 # Jupyter
 .ipynb_checkpoints/
@@ -21,21 +23,49 @@ env/
 # OS
 .DS_Store
 
-# Data
-data/raw/*
-data/processed/*
-data/samples/*
+# -------------------------
+# Project data
+# -------------------------
 
-# Vector databases
-chroma_db/
-chroma_data/
+# Raw documents and downloaded input data
+data/raw/
+
+# Processed/generated datasets
+data/processed/
+
+# Sample data
+data/samples/
+
+# Vector database
 data/vectorstore/
 
+# -------------------------
+# Evaluation
+# -------------------------
+
+# Keep:
+# data/evaluation/questions.jsonl
+# data/evaluation/manually_evaluated_results.jsonl
+
+# Generated evaluation artifacts
+data/evaluation/preprocessed_questions.jsonl
+data/evaluation/prompts.jsonl
+data/evaluation/retrieval_review.jsonl
+data/evaluation/retrieval_review.txt
+data/evaluation/llm_results.jsonl
+
+# Generated/manual prompt files
+data/evaluation/manual_prompts/
+
+# -------------------------
 # MLflow
+# -------------------------
 mlruns/
 mlartifacts/
 
+# -------------------------
 # Models
+# -------------------------
 models/
 *.pkl
 *.pickle
@@ -44,18 +74,27 @@ models/
 *.pth
 *.onnx
 
+# -------------------------
 # Logs
+# -------------------------
 logs/
 *.log
 
+# -------------------------
 # Temporary files
+# -------------------------
 tmp/
 temp/
 
+# -------------------------
 # Python packaging
+# -------------------------
 *.egg-info/
 dist/
 build/
 
 # README draft
 README.draft.md
+
+# Evaluation source / experiments
+src/evaluation/
