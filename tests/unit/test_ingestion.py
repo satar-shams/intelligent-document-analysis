@@ -10,15 +10,16 @@ from src.ingestion.pdf_parser import PyMuPDFExtractor
 from src.schemas import Document, Page
 
 
-PDF_PATH = Path(
-    "data/raw/pdf/sample-10-page-pdf-a4-size.pdf"
+from src.config import (
+    DOCX_TEST_FILE,
+    OCR_TEST_FILE,
+    PDF_TEST_FILE,
 )
-DOCX_PATH = Path(
-    "data/raw/docx/sample-files.com-basic-text.docx"
-)
-OCR_PDF_PATH = Path(
-    "data/raw/pdf/sample-ocr.pdf"
-)
+
+
+PDF_PATH = Path(PDF_TEST_FILE)
+DOCX_PATH = Path(DOCX_TEST_FILE)
+OCR_PDF_PATH = Path(OCR_TEST_FILE)
 
 
 def test_pdf_extractor_returns_document():

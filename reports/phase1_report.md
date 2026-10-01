@@ -132,7 +132,6 @@ intelligent-document-analysis/
 ├── tests/
 │   ├── integration/
 │   │   ├── test_ingestion_real_data.py
-│   │   ├── test_retrieval_evaluation.py
 │   │   └── test_vectorstore_real_data.py
 │   │
 │   └── unit/

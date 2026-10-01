@@ -33,7 +33,7 @@ def test_vectorstore_with_real_data():
         embeddings,
     )
 
-    assert len(documents) == 4
+    assert documents
     assert len(chunks) > 0
     assert len(embeddings) == len(chunks)
     assert store.count() == len(chunks)

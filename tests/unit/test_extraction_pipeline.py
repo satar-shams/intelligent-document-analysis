@@ -1,37 +1,14 @@
 from src.extraction.extraction_pipeline import (
     run_extraction,
 )
-
-
-class FakeEntity:
-    def __init__(
-        self,
-        text,
-        label,
-        start,
-        end,
-        confidence,
-        chunk_id,
-        document_id,
-        page_start,
-        page_end,
-    ):
-        self.text = text
-        self.label = label
-        self.start = start
-        self.end = end
-        self.confidence = confidence
-        self.chunk_id = chunk_id
-        self.document_id = document_id
-        self.page_start = page_start
-        self.page_end = page_end
+from src.schemas import ExtractedEntity
 
 
 def test_run_extraction_adds_predicted_entities(
     monkeypatch,
 ):
 
-    fake_entity = FakeEntity(
+    fake_entity = ExtractedEntity(
         text="Microsoft",
         label="ORGANIZATION",
         start=0,
@@ -43,12 +20,12 @@ def test_run_extraction_adds_predicted_entities(
         page_end=1,
     )
 
-    class FakeNERModel:
+    class FakeEntityExtractor:
 
         def __init__(self):
             pass
 
-        def predict(
+        def extract(
             self,
             text,
             context,
@@ -56,8 +33,8 @@ def test_run_extraction_adds_predicted_entities(
             return [fake_entity]
 
     monkeypatch.setattr(
-        "src.extraction.extraction_pipeline.NERModel",
-        FakeNERModel,
+        "src.extraction.extraction_pipeline.EntityExtractor",
+        FakeEntityExtractor,
     )
 
     records = [
@@ -97,12 +74,12 @@ def test_run_extraction_preserves_original_records(
     monkeypatch,
 ):
 
-    class FakeNERModel:
+    class FakeEntityExtractor:
 
         def __init__(self):
             pass
 
-        def predict(
+        def extract(
             self,
             text,
             context,
@@ -110,8 +87,8 @@ def test_run_extraction_preserves_original_records(
             return []
 
     monkeypatch.setattr(
-        "src.extraction.extraction_pipeline.NERModel",
-        FakeNERModel,
+        "src.extraction.extraction_pipeline.EntityExtractor",
+        FakeEntityExtractor,
     )
 
     records = [
@@ -142,20 +119,19 @@ def test_run_extraction_handles_multiple_chunks(
     monkeypatch,
 ):
 
-    class FakeNERModel:
+    class FakeEntityExtractor:
 
         def __init__(self):
             pass
 
-        def predict(
+        def extract(
             self,
             text,
             context,
         ):
-
             if "Microsoft" in text:
                 return [
-                    FakeEntity(
+                    ExtractedEntity(
                         text="Microsoft",
                         label="ORGANIZATION",
                         start=0,
@@ -171,8 +147,8 @@ def test_run_extraction_handles_multiple_chunks(
             return []
 
     monkeypatch.setattr(
-        "src.extraction.extraction_pipeline.NERModel",
-        FakeNERModel,
+        "src.extraction.extraction_pipeline.EntityExtractor",
+        FakeEntityExtractor,
     )
 
     records = [

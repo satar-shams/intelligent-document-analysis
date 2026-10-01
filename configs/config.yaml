@@ -13,9 +13,9 @@ ingestion:
   input_directory: data/raw
 
   test_files:
-    pdf: data/raw/pdf/sample-10-page-pdf-a4-size.pdf
-    docx: data/raw/docx/sample-files.com-basic-text.docx
-    ocr: data/raw/pdf/sample-ocr.pdf
+    pdf: data/phase1/sample-10-page-pdf-a4-size.pdf
+    docx: data/phase1/sample-files.com-basic-text.docx
+    ocr: data/phase1/sample-ocr.pdf
 
   ocr:
     start_page: 11
