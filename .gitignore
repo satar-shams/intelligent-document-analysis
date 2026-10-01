@@ -35,6 +35,7 @@ data/processed/
 
 # Sample data
 data/samples/
+data/phase1/
 
 # Vector database
 data/vectorstore/
