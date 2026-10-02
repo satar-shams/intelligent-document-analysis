@@ -13,9 +13,9 @@ ingestion:
   input_directory: data/raw
 
   test_files:
-    pdf: data/phase1/sample-10-page-pdf-a4-size.pdf
-    docx: data/phase1/sample-files.com-basic-text.docx
-    ocr: data/phase1/sample-ocr.pdf
+    pdf: data/phase1/sample_pdf_text_a4.pdf
+    docx: data/phase1/sample_docx.docx
+    ocr: data/phase1/sample_pdf_ocr.pdf
 
   ocr:
     start_page: 11
@@ -38,7 +38,6 @@ vectorstore:
 annotation:
   annotation_sample_size: 500
   annotation_random_seed: 42
-
   annotation_train_ratio: 0.70
   annotation_validation_ratio: 0.15
   annotation_test_ratio: 0.15

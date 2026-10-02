@@ -60,13 +60,13 @@ Semantic Search
 The complete pipeline is implemented in:
 
 ```text
-src/pipelines/phase1_pipeline.py
+pipelines/phase1.py
 ```
 
 Run it with:
 
 ```bash
-python -m src.pipelines.phase1_pipeline
+python -m pipelines.phase1
 ```
 
 The pipeline currently clears and recreates the configured ChromaDB collection before storing the newly processed documents. This keeps repeated development runs deterministic and avoids accumulating duplicate data during the current development stage.
@@ -388,7 +388,7 @@ The complete chunk remains available to the retrieval system; only the demonstra
 Run the complete Phase 1 pipeline:
 
 ```bash
-python -m src.pipelines.phase1_pipeline
+python -m pipelines.phase1
 ```
 
 The pipeline performs:

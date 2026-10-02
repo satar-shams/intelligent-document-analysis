@@ -1,8 +1,5 @@
-from src.extraction.extraction_pipeline import (
-    run_extraction,
-)
+from pipelines.extraction import run_extraction
 from src.schemas import ExtractedEntity
-
 
 def test_run_extraction_adds_predicted_entities(
     monkeypatch,
@@ -33,7 +30,7 @@ def test_run_extraction_adds_predicted_entities(
             return [fake_entity]
 
     monkeypatch.setattr(
-        "src.extraction.extraction_pipeline.EntityExtractor",
+        "pipelines.extraction.EntityExtractor",
         FakeEntityExtractor,
     )
 
@@ -87,7 +84,7 @@ def test_run_extraction_preserves_original_records(
             return []
 
     monkeypatch.setattr(
-        "src.extraction.extraction_pipeline.EntityExtractor",
+        "pipelines.extraction.EntityExtractor",
         FakeEntityExtractor,
     )
 
@@ -147,7 +144,7 @@ def test_run_extraction_handles_multiple_chunks(
             return []
 
     monkeypatch.setattr(
-        "src.extraction.extraction_pipeline.EntityExtractor",
+        "pipelines.extraction.EntityExtractor",
         FakeEntityExtractor,
     )
 

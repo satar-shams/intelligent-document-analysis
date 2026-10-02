@@ -31,7 +31,7 @@ def test_rag_chain_real_data():
     )
 
     result = rag_chain.run(
-        query="When he came to the war he was barely eighteen",
+        query="What was the total revenue in fiscal year 2025?",
         top_k=5,
     )
 
