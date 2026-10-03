@@ -10,7 +10,7 @@
 
 Phase 3 extends IDA from document retrieval and structured information extraction to a Retrieval-Augmented Generation (RAG) system.
 
-The objective is to accept a natural-language question, retrieve relevant document chunks, construct a grounded prompt, and generate an answer using an external language model.
+The objective is to accept a natural-language question, retrieve relevant document chunks, construct grounded context and a prompt, and generate an answer through an external language model.
 
 The complete workflow is:
 
@@ -30,41 +30,44 @@ Generated Answer
 Persisted Result
 ```
 
-For evaluation, the same pipeline can process a predefined set of questions.
+The same architecture supports both single-question execution and batch processing of predefined evaluation questions.
 
-Phase 3 therefore establishes the generation, orchestration, persistence, testing, and evaluation layers on top of the retrieval infrastructure developed in earlier phases.
+Phase 3 therefore establishes the generation and orchestration layer on top of the retrieval infrastructure developed in earlier phases.
 
 ---
 
-# 2. Phase 3 Architecture
+# 2. Architecture
 
 The main RAG components are located in:
 
 ```text
 src/rag/
 
-├── retriever.py
 ├── context_builder.py
-├── prompt_templates.py
+├── evaluation_summary.py
 ├── llm_client.py
+├── prompt_templates.py
 ├── rag_chain.py
-├── rag_pipeline.py
-└── evaluation_summary.py
+└── retriever.py
 ```
 
-Their responsibilities are:
+Batch execution is implemented through:
 
-| Component            | Responsibility                              |
-| -------------------- | ------------------------------------------- |
-| `Retriever`          | Retrieves relevant chunks from ChromaDB     |
-| `ContextBuilder`     | Converts retrieval results into LLM context |
-| `PromptBuilder`      | Constructs the final prompt                 |
-| `LLMClient`          | Provides the external LLM interface         |
-| `RAGChain`           | Orchestrates a single question              |
-| `RAGPipeline`        | Processes multiple questions                |
-| `evaluation_summary` | Summarizes manual evaluation results        |
+```text
+pipelines/rag.py
+```
 
-The architecture uses dependency injection so individual components can be tested and replaced independently.
+| Component               | Responsibility                              |
+| ----------------------- | ------------------------------------------- |
+| `Retriever`             | Retrieves relevant chunks from ChromaDB     |
+| `ContextBuilder`        | Converts retrieval results into LLM context |
+| `PromptBuilder`         | Constructs the final prompt                 |
+| `LLMClient`             | Provides the external LLM interface         |
+| `RAGChain`              | Orchestrates a single question              |
+| `pipelines/rag.py`      | Processes multiple evaluation questions     |
+| `evaluation_summary.py` | Summarizes manual evaluation results        |
+
+The components use dependency injection so retrieval, context construction, prompting, and LLM communication can be tested independently.
 
 ---
 
@@ -103,7 +106,7 @@ RAGChain(
 )
 ```
 
-A question is executed through:
+A question can then be executed through:
 
 ```python
 answer = rag_chain.run(
@@ -112,15 +115,13 @@ answer = rag_chain.run(
 )
 ```
 
-The chain itself does not create its dependencies, which keeps orchestration separate from implementation details.
+This keeps orchestration separate from the individual retrieval, context, prompt, and LLM implementations.
 
 ---
 
-# 4. Retrieval
+# 4. Retrieval and Context Construction
 
-The `Retriever` uses the existing ChromaDB vector store and embedding infrastructure to identify relevant document chunks.
-
-Example:
+The `Retriever` uses the existing embedding and ChromaDB infrastructure to identify relevant document chunks.
 
 ```python
 search_results = retriever.retrieve(
@@ -129,7 +130,7 @@ search_results = retriever.retrieve(
 )
 ```
 
-A retrieval result contains information such as:
+Each retrieval result preserves information such as:
 
 ```text
 chunk_id
@@ -140,17 +141,9 @@ distance
 text
 ```
 
-This preserves both the retrieved evidence and its document context.
+`ContextBuilder` converts these structured results into textual context while preserving document and page metadata.
 
-The retrieved results are passed directly to `ContextBuilder`.
-
----
-
-# 5. Context Construction
-
-`ContextBuilder` converts structured retrieval results into the textual context supplied to the LLM.
-
-The context preserves:
+The resulting context contains:
 
 ```text
 chunk identification
@@ -159,58 +152,38 @@ page information
 source text
 ```
 
-Conceptually:
-
-```text
-Search Results
-      ↓
-ContextBuilder
-      ↓
-Document-aware textual context
-```
-
-Keeping document metadata alongside the source text allows the RAG system to retain the provenance of retrieved evidence throughout the generation process.
+This context is then passed to the prompt construction stage.
 
 ---
 
-# 6. Prompt Construction
+# 5. Prompt Construction
 
-`PromptBuilder` combines three inputs:
+`PromptBuilder` combines:
 
-1. System instruction
-2. Retrieved context
-3. User question
+1. the system instruction;
+2. retrieved context;
+3. the user question.
 
-The current instruction is intentionally restrictive:
+The current instruction establishes the intended grounding behavior:
 
 ```text
 Answer the question using only the provided context.
+
 Do not add or invent information that is not supported by the context.
+
 If the context does not contain enough information to answer the question,
 say that the available context does not provide enough information.
 ```
 
-The resulting prompt therefore follows:
-
-```text
-Instruction
-    +
-Retrieved Context
-    +
-Question
-    ↓
-Final Prompt
-```
-
-This instruction establishes the intended grounding behavior of the RAG system.
+The prompt therefore explicitly instructs the model not to infer unsupported information when the retrieved evidence is insufficient.
 
 ---
 
-# 7. LLM Client
+# 6. LLM Client
 
 `LLMClient` provides a small abstraction around the external language-model API.
 
-The RAG system only needs:
+The generation interface is:
 
 ```python
 answer = llm_client.generate(
@@ -220,13 +193,13 @@ answer = llm_client.generate(
 
 The current implementation uses the OpenAI Responses API.
 
-The API credential is loaded from the environment rather than stored in source code:
+The API credential is supplied through the environment:
 
 ```text
 OPENAI_API_KEY=...
 ```
 
-The intended execution is:
+The intended execution flow is:
 
 ```text
 Prompt
@@ -238,22 +211,22 @@ response.output_text
 Answer
 ```
 
-Live API execution is currently unavailable because the configured OpenAI account has no remaining API credits.
-
-The API integration itself remains implemented in the codebase.
+The API integration is implemented in the codebase, but live API execution was not available during the final evaluation because API credit access was unavailable.
 
 ---
 
-# 8. Batch RAG Pipeline
+# 7. Batch RAG Pipeline
 
-`RAGPipeline` extends the single-question chain to multiple questions.
+The batch RAG execution is implemented in:
 
-The batch workflow is:
+```text
+pipelines/rag.py
+```
+
+It processes predefined questions independently:
 
 ```text
 Evaluation Questions
-        ↓
-Question Preprocessing
         ↓
 Retrieval
         ↓
@@ -266,94 +239,19 @@ LLM
 Results
 ```
 
-Questions are processed independently, making the pipeline suitable for:
-
-* evaluation;
-* batch experiments;
-* offline testing;
-* future automated benchmarking.
-
-The evaluation input is:
+The evaluation questions are stored in:
 
 ```text
 data/evaluation/questions.jsonl
 ```
 
-Each JSONL record represents one question.
+For each question, the pipeline can preserve the query, generated prompt, answer, and retrieved-result metadata.
 
 ---
 
-# 9. Evaluation Preparation
+# 8. Evaluation Methodology
 
-The evaluation questions are validated before RAG processing.
-
-The pipeline checks that:
-
-```text
-id exists
-query exists
-query is a string
-query is not empty
-```
-
-Surrounding whitespace is removed from questions.
-
-The processed questions are stored in:
-
-```text
-data/evaluation/preprocessed_questions.jsonl
-```
-
-Generated prompts are stored in:
-
-```text
-data/evaluation/prompts.jsonl
-```
-
-A prompt record also preserves retrieval metadata such as:
-
-```text
-rank
-chunk_id
-document_id
-page_start
-page_end
-distance
-```
-
-This provides a reproducible record of the evidence and prompt prepared for each question.
-
----
-
-# 10. Result Persistence
-
-When live LLM execution is available, generated answers can be stored in:
-
-```text
-data/evaluation/llm_results.jsonl
-```
-
-The result record contains the generated answer together with the relevant question and retrieval information.
-
-The distinction between generated output and evaluation is intentional:
-
-```text
-LLM Result
-    ↓
-System Output
-
-Evaluation
-    ↓
-Judgment of System Output
-```
-
-The presence of an answer in `llm_results.jsonl` does not imply that the answer is correct or sufficiently grounded.
-
----
-
-# 11. Manual Evaluation
-
-Because live OpenAI execution is currently unavailable, an initial manual evaluation was performed using the generated prompts and ChatGPT.
+Because live OpenAI execution was unavailable, Phase 3 evaluation was performed manually using the prepared questions, retrieved context, and available generated/manual answers.
 
 The manually reviewed results are stored in:
 
@@ -373,25 +271,23 @@ evaluation.grounded
 evaluation.notes
 ```
 
-Three main questions are evaluated:
+Three aspects were evaluated:
 
 ### Answerability
 
-Does the retrieved context contain enough information to answer the question?
+Whether the retrieved context contains enough information to answer the question.
 
 ### Correctness
 
-Does the generated answer correctly answer the question based on the available evidence?
+Whether the answer correctly addresses the question based on the available evidence.
 
 ### Grounding
 
-Is the answer supported by the retrieved context rather than unsupported external information?
-
-This separates retrieval quality from generation quality.
+Whether the answer is supported by the retrieved context rather than unsupported external information.
 
 ---
 
-# 12. Evaluation Dataset
+# 9. Evaluation Dataset and Results
 
 The initial evaluation set contains:
 
@@ -399,7 +295,7 @@ The initial evaluation set contains:
 15 questions
 ```
 
-The questions cover several types of RAG behavior:
+The questions cover:
 
 ```text
 Direct factual questions
@@ -410,12 +306,6 @@ Percentage calculations
 Remaining-performance-obligation questions
 Questions where the retrieved context is insufficient
 ```
-
-This provides a small functional evaluation set rather than a large statistical benchmark.
-
----
-
-# 13. Initial Evaluation Results
 
 The manual evaluation produced:
 
@@ -445,79 +335,31 @@ Grounded answers        : 100.0%
 Not grounded            :   0.0%
 ```
 
-These results should be interpreted as a **manual baseline**, not as a statistically representative evaluation of RAG quality.
-
-The dataset contains only 15 questions, and the judgments were manually performed.
+These results represent a **manual functional baseline**, not a statistically representative benchmark. The evaluation contains only 15 questions and relies on manual judgment.
 
 ---
 
-# 14. Grounded Answer Behavior
+# 10. Retrieval Limitation and Observed Behavior
 
-One important behavior observed during evaluation is that the prompt instruction can cause the system to explicitly refuse unsupported answers rather than inventing information.
+The main limitation observed during Phase 3 is retrieval quality.
 
-For example, when retrieval identifies references to:
-
-```text
-Fiscal Year 2025 Compared with Fiscal Year 2024
-```
-
-but does not retrieve the actual 2025 revenue value, the appropriate response is:
-
-```text
-The available context does not provide enough information
-to determine the total revenue in fiscal year 2025.
-```
-
-This behavior is important for the current RAG design because the system is explicitly instructed to rely only on retrieved context.
-
----
-
-# 15. Calculation and Evidence Handling
-
-The evaluation also includes questions requiring simple calculations from retrieved evidence.
-
-For example:
-
-```text
-2021: $146 billion
-2022: $193 billion
-```
-
-The change is:
-
-```text
-$193 billion - $146 billion = $47 billion
-```
-
-and the relative increase is:
-
-```text
-(193 - 146) / 146 × 100 ≈ 32.2%
-```
-
-Such cases test whether the generation stage can use numerical evidence contained in the retrieved context rather than merely repeating a retrieved sentence.
-
----
-
-# 16. Retrieval Limitation
-
-The main limitation observed during Phase 3 evaluation is retrieval quality.
-
-A question may be semantically related to retrieved chunks without the chunks containing the exact evidence required for the answer.
+A question may be semantically related to retrieved chunks without those chunks containing the exact evidence required to answer it.
 
 For example:
 
 ```text
 Question:
+
 total fiscal-year-2025 revenue
 
 Retrieved context:
+
 Fiscal Year 2025 Compared with Fiscal Year 2024
 ```
 
-The context is related to the question but may not contain the required revenue figure.
+The retrieved context is relevant to the question but may not contain the required revenue figure.
 
-The resulting dependency is:
+The resulting limitation can be summarized as:
 
 ```text
 Insufficient Retrieval
@@ -527,17 +369,19 @@ Insufficient Context
 Limited Generation
 ```
 
-Therefore, some RAG failures originate before the LLM generation stage.
+The grounding instruction is designed to prevent the generation layer from inventing missing information. When the required evidence is absent, the intended behavior is to indicate that the available context is insufficient.
 
-Retrieval optimization is intentionally deferred to future work rather than being treated as a Phase 3 requirement.
+This demonstrates that some RAG failures originate in retrieval rather than generation.
+
+Retrieval optimization is therefore deferred to future work.
 
 ---
 
-# 17. Testing
+# 11. Testing
 
 Phase 3 includes unit and integration tests for the RAG components.
 
-Current test structure:
+The relevant tests are:
 
 ```text
 tests/
@@ -551,7 +395,7 @@ tests/
     └── test_rag_chain.py
 ```
 
-The integration test uses the real retrieval stack:
+The integration test uses the retrieval stack together with a mock LLM:
 
 ```text
 EmbeddingPipeline
@@ -567,15 +411,13 @@ PromptBuilder
 Mock LLM
 ```
 
-The external LLM API is intentionally not required for the integration test.
+The external LLM API is therefore not required for the integration test.
 
-The current RAG integration test passed successfully.
-
-The separate RAG unit tests also passed, providing coverage for prompt construction and mock LLM behavior.
+The RAG unit tests and integration test passed successfully.
 
 ---
 
-# 18. Environment Configuration
+# 12. Environment and Security
 
 The external API credential is provided through the environment:
 
@@ -597,68 +439,50 @@ LLMClient
 OpenAI Client
 ```
 
-API credentials must never be committed to the repository.
+API credentials must not be committed to the repository.
 
 Any previously exposed credential should be revoked rather than reused.
 
 ---
 
-# 19. Phase 3 File Structure
+# 13. Evaluation Artifacts and Execution
 
-The main Phase 3 structure is:
+The main evaluation data is stored under:
 
 ```text
-ida/
-
-├── data/
-│   └── evaluation/
-│       ├── questions.jsonl
-│       ├── preprocessed_questions.jsonl
-│       ├── prompts.jsonl
-│       ├── manually_evaluated_results.jsonl
-│       └── llm_results.jsonl
-│
-├── src/
-│   ├── evaluation/
-│   │   └── prepare_prompts.py
-│   │
-│   └── rag/
-│       ├── context_builder.py
-│       ├── evaluation_summary.py
-│       ├── llm_client.py
-│       ├── prompt_templates.py
-│       ├── rag_chain.py
-│       ├── rag_pipeline.py
-│       └── retriever.py
-│
-└── tests/
-    ├── unit/
-    │   └── rag/
-    │       ├── test_mock_llm.py
-    │       └── test_prompt_templates.py
-    │
-    └── integration/
-        └── test_rag_chain.py
+data/evaluation/
 ```
 
-Generated evaluation artifacts are not treated as permanent source code.
+Important artifacts include:
 
----
+```text
+questions.jsonl
+preprocessed_questions.jsonl
+prompts.jsonl
+results.jsonl
+manually_evaluated_results.jsonl
+retrieval_review.jsonl
+retrieval_review.txt
+```
 
-# 20. Execution
+These files preserve the questions, retrieval and prompt outputs, generated results where available, and manual evaluation records used during Phase 3.
 
-The single-question RAG chain can be exercised with:
+The batch pipeline can be executed with:
+
+```bash
+python -m pipelines.rag
+```
+
+Live generation requires:
+
+```text
+OPENAI_API_KEY
+```
+
+The single-question RAG chain can also be exercised through:
 
 ```bash
 python -m src.rag.rag_chain
-```
-
-The current development configuration uses a mock LLM where live API access is unavailable.
-
-Evaluation prompts can be generated with:
-
-```bash
-python -m src.evaluation.prepare_prompts
 ```
 
 The evaluation summary can be generated with:
@@ -667,19 +491,11 @@ The evaluation summary can be generated with:
 python -m src.rag.evaluation_summary
 ```
 
-The prompt-preparation stage reports:
-
-```text
-Input questions       : data/evaluation/questions.jsonl
-Processed questions   : data/evaluation/preprocessed_questions.jsonl
-Generated prompts     : data/evaluation/prompts.jsonl
-Number of questions   : 15
-Top K                 : 10
-```
+The execution path depends on whether live API access or the local/mock evaluation path is being used.
 
 ---
 
-# 21. Implementation Status
+# 14. Implementation Status
 
 The following Phase 3 components are implemented:
 
@@ -690,7 +506,7 @@ The following Phase 3 components are implemented:
 ✓ OpenAI client
 ✓ Dependency injection
 ✓ Single-question RAGChain
-✓ Batch RAGPipeline
+✓ Batch RAG pipeline
 ✓ Question preprocessing
 ✓ Prompt persistence
 ✓ Result persistence
@@ -701,27 +517,22 @@ The following Phase 3 components are implemented:
 ✓ Environment-based API configuration
 ```
 
-The following items remain externally constrained or intentionally deferred:
+The following items remain intentionally deferred:
 
 ```text
 ⚠ Live LLM execution
-  Blocked by API credit availability
+  Requires available API access
 
 🔜 Retrieval optimization
-  Deferred to future iteration
-
 🔜 Larger-scale automated evaluation
-  Deferred to future iteration
-
 🔜 Systematic LLM/model comparison
-  Deferred to future iteration
 ```
+
+The deferred items are improvements to the baseline rather than missing components of the current architecture.
 
 ---
 
-# 22. Future Work
-
-The main future improvements are:
+# 15. Future Work
 
 ### Retrieval
 
@@ -737,7 +548,7 @@ Expand the question set and automate more of the evaluation process.
 
 ### LLM Evaluation
 
-Evaluate multiple language models under the same retrieval and prompt conditions.
+Evaluate multiple language models under consistent retrieval and prompt conditions.
 
 ### Source Attribution
 
@@ -745,23 +556,13 @@ Expose document and page references alongside generated answers.
 
 ### Reliability
 
-Add stronger handling for:
-
-```text
-API failures
-rate limits
-timeouts
-empty retrieval results
-malformed responses
-```
-
-These are improvements to the existing baseline rather than prerequisites for the current Phase 3 architecture.
+Improve handling of API failures, rate limits, timeouts, empty retrieval results, and malformed responses.
 
 ---
 
-# 23. Phase 3 Conclusion
+# 16. Phase 3 Conclusion
 
-Phase 3 establishes a complete baseline RAG architecture on top of the IDA retrieval infrastructure.
+Phase 3 establishes a baseline RAG architecture on top of the IDA retrieval infrastructure.
 
 The implemented system provides:
 
@@ -789,10 +590,10 @@ Correct answers         : 14 / 15
 Grounded answers        : 15 / 15
 ```
 
-These results demonstrate the functionality of the current baseline but should not be interpreted as a formal benchmark because of the small manually evaluated dataset and the current retrieval limitations.
+These results document the behavior of the current baseline but should not be interpreted as a formal benchmark because of the small manually evaluated dataset and the observed retrieval limitations.
 
-The most important limitation identified in Phase 3 is retrieval quality: if the required evidence is not retrieved, the generation layer cannot reliably answer the question.
+The main technical limitation identified during Phase 3 is retrieval quality: when the required evidence is not retrieved, the generation layer cannot reliably answer the question.
 
-Live OpenAI execution is also currently unavailable because of API credit limitations, but the LLM integration is implemented and the RAG architecture can use the same pipeline when API access becomes available.
+Live OpenAI execution was unavailable during the final evaluation because of API credit limitations, but the LLM integration itself is implemented and tested through the project abstractions and mock-based integration path.
 
 **Phase 3 is considered complete as a baseline RAG generation, orchestration, persistence, testing, and manual-evaluation implementation.**

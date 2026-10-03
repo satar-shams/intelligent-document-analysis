@@ -2,86 +2,102 @@
 
 ## 1. Purpose
 
-This document defines the annotation rules for the initial
-Named Entity Recognition (NER) dataset used in Task 2 of the
-Intelligent Document Analysis project.
+This document defines the annotation rules for the initial Named Entity Recognition (NER) dataset used in the Intelligent Document Analysis project.
 
-The goal is to identify important entities in business and
-financial documents while keeping the annotation scheme
-small, consistent, and suitable for transformer-based NER.
+The goal is to identify important entities in business and financial documents using a small, consistent schema suitable for NER model development and evaluation.
+
+The guidelines are designed to support reproducible annotation and future human verification of the automatically generated weak annotations.
 
 ---
 
-## 2. Entity Labels
+## 2. Entity Schema
 
-The initial annotation schema contains seven entity types:
+The target annotation schema contains seven entity types:
 
-- PERSON
-- ORG
-- LOCATION
-- DATE
-- MONEY
-- PERCENT
-- PRODUCT
+* PERSON
+* ORGANIZATION
+* LOCATION
+* DATE
+* MONEY
+* PERCENTAGE
+* PRODUCT
+
+The initial automated weak-annotation implementation covers five categories:
+
+* ORGANIZATION
+* PRODUCT
+* DATE
+* MONEY
+* PERCENTAGE
+
+PERSON and LOCATION are included in the target schema for NER and future annotation/model development.
 
 ---
 
 ## 3. General Annotation Rules
 
-### 3.1 Annotate only entities from the defined schema
+### 3.1 Use only defined labels
 
 Do not create new labels during annotation.
 
-If a piece of text does not belong to one of the seven defined
-categories, leave it unannotated.
+If a piece of text does not belong to one of the defined categories, leave it unannotated.
 
 ### 3.2 Annotate the complete entity span
 
-When an entity contains multiple words, annotate the complete
-meaningful span.
+When an entity contains multiple words, annotate the complete meaningful span.
 
 Example:
 
-"Satya Nadella"
+```text
+Satya Nadella
+```
 
-Annotate:
+Correct:
 
+```text
 PERSON = "Satya Nadella"
+```
 
 Not:
 
+```text
 PERSON = "Satya"
+```
 
 ### 3.3 Preserve the original text
 
-Entity text must be copied exactly from the source text.
+Entity text must be copied exactly from the source.
 
-Do not normalize spelling, capitalization, punctuation, or
-whitespace inside an entity.
+Do not normalize spelling, capitalization, punctuation, or whitespace inside an entity.
 
-### 3.4 Do not annotate surrounding context
+### 3.4 Exclude surrounding context
 
-Only the entity itself should be annotated.
+Annotate only the entity itself.
 
 Example:
 
-"Microsoft announced new products"
+```text
+Microsoft announced new products
+```
 
-Annotate:
+Correct:
 
-ORG = "Microsoft"
+```text
+ORGANIZATION = "Microsoft"
+```
 
-Do not annotate:
+Do not annotate surrounding phrases such as:
 
+```text
 "Microsoft announced"
 "new products"
+```
 
-### 3.5 Nested entities
+### 3.5 Avoid overlapping or nested entities
 
-Do not create overlapping or nested entities in the initial
-dataset.
+The initial annotation scheme does not use overlapping or nested entities.
 
-Choose the single entity span that best matches the schema.
+When multiple interpretations are possible, select the single span that best matches the defined schema.
 
 ---
 
@@ -95,51 +111,57 @@ A PERSON is the name of an individual human being.
 
 ### Examples
 
-"Satya Nadella"
-"Bill Gates"
-"Amy Hood"
+```text
+Satya Nadella
+Bill Gates
+Amy Hood
+```
 
-### Annotate
+Annotate:
 
+```text
 "Satya Nadella" → PERSON
+```
 
-### Do not annotate
+Do not annotate generic groups or roles such as:
 
-"customers"
-"employees"
-"investors"
-"management"
-
-These refer to groups or roles rather than named individuals.
+```text
+customers
+employees
+investors
+management
+```
 
 ---
 
-## 4.2 ORG
+## 4.2 ORGANIZATION
 
 ### Definition
 
-ORG represents companies, corporations, institutions,
-government organizations, agencies, or other formally named
-organizations.
+ORGANIZATION represents companies, corporations, institutions, government organizations, agencies, and other formally named organizations.
 
 ### Examples
 
-"Microsoft"
-"Microsoft Corporation"
-"U.S. Securities and Exchange Commission"
+```text
+Microsoft
+Microsoft Corporation
+U.S. Securities and Exchange Commission
+```
 
-### Annotate
+Annotate:
 
-"Microsoft" → ORG
+```text
+"Microsoft" → ORGANIZATION
+```
 
-### Do not annotate
+Do not annotate generic descriptions such as:
 
-"company"
-"customers"
-"management"
-"employees"
-
-These are generic descriptions rather than named organizations.
+```text
+company
+customers
+management
+employees
+```
 
 ---
 
@@ -147,36 +169,39 @@ These are generic descriptions rather than named organizations.
 
 ### Definition
 
-LOCATION represents named geographic locations.
+LOCATION represents named geographic locations, including:
 
-This includes:
-
-- countries
-- cities
-- states/provinces
-- regions
-- continents
-- other named geographic areas
+* countries
+* cities
+* states or provinces
+* regions
+* continents
+* other named geographic areas
 
 ### Examples
 
-"Ukraine"
-"United States"
-"Seattle"
-"Europe"
+```text
+Ukraine
+United States
+Seattle
+Europe
+```
 
-### Annotate
+Annotate:
 
+```text
 "United States" → LOCATION
+```
 
-### Do not annotate
+Do not annotate generic terms such as:
 
-"market"
-"region"
-"country"
+```text
+market
+region
+country
+```
 
-when they are used generically rather than as a specific
-geographic name.
+unless they refer to a specific named geographic entity.
 
 ---
 
@@ -184,26 +209,25 @@ geographic name.
 
 ### Definition
 
-DATE represents explicit temporal expressions referring to a
-specific date, year, month, period, or date range.
+DATE represents explicit temporal expressions referring to a specific date, year, month, period, or date range.
 
 ### Examples
 
-"June 30, 2021"
-"2020"
-"fiscal year 2021"
-"the first quarter of 2022"
+```text
+June 30, 2021
+2020
+fiscal year 2021
+the first quarter of 2022
+```
 
-### Annotate
+Annotate:
 
+```text
 "June 30, 2021" → DATE
-
 "2020" → DATE
+```
 
-### General rule
-
-If the expression clearly identifies a time period relevant
-to the document, annotate it as DATE.
+If an expression clearly identifies a relevant time period, annotate the complete temporal expression.
 
 ---
 
@@ -211,61 +235,67 @@ to the document, annotate it as DATE.
 
 ### Definition
 
-MONEY represents monetary amounts and their associated currency
-or monetary unit.
+MONEY represents monetary amounts together with their associated currency or monetary unit.
 
 ### Examples
 
-"$339 million"
-"$50 billion"
-"€5 million"
-"USD 10 million"
+```text
+$339 million
+$50 billion
+€5 million
+USD 10 million
+```
 
-### Annotate the complete monetary expression
+Annotate the complete monetary expression:
 
+```text
 "$339 million" → MONEY
-
 "$50 billion" → MONEY
+```
 
-### Do not annotate
+Do not annotate generic financial concepts such as:
 
-"revenue"
-"profit"
-"cost"
-"financial results"
+```text
+revenue
+profit
+cost
+financial results
+```
 
 unless the expression itself contains a monetary value.
 
 ---
 
-## 4.6 PERCENT
+## 4.6 PERCENTAGE
 
 ### Definition
 
-PERCENT represents percentages or explicit percentage values.
+PERCENTAGE represents explicit percentage values.
 
 ### Examples
 
-"36 percent"
-"10%"
-"5.5%"
+```text
+36 percent
+10%
+5.5%
+```
 
-### Annotate
+Annotate the complete percentage expression:
 
-"36 percent" → PERCENT
+```text
+"36 percent" → PERCENTAGE
+"10%" → PERCENTAGE
+```
 
-"10%" → PERCENT
+A number by itself is not a percentage:
 
-### Do not annotate
+```text
+36
+500
+10 million
+```
 
-"36"
-"five percent growth"
-
-if the percentage expression is not clearly represented as a
-percentage value.
-
-When a percentage is explicitly expressed, annotate the complete
-percentage expression.
+Annotate a percentage only when the expression clearly represents a percentage value.
 
 ---
 
@@ -273,75 +303,92 @@ percentage expression.
 
 ### Definition
 
-PRODUCT represents named commercial products, software products,
-services, platforms, or product families.
+PRODUCT represents named commercial products, software products, services, platforms, or product families.
 
 ### Examples
 
-"Microsoft 365"
-"Windows"
-"Azure"
-"Xbox"
+```text
+Microsoft 365
+Windows
+Azure
+Xbox
+```
 
-### Annotate
+Annotate:
 
+```text
 "Microsoft 365" → PRODUCT
-
 "Windows" → PRODUCT
+```
 
-### Do not annotate
+Do not annotate generic descriptions such as:
 
-"software"
-"cloud services"
-"operating system"
+```text
+software
+cloud services
+operating system
+```
 
-when they are generic descriptions rather than named products.
+unless they are part of a named product expression.
 
 ---
 
 # 5. Ambiguous Cases
 
-When an entity could belong to multiple categories, use the
-following rules.
+## 5.1 Product vs Organization
 
-## Product vs Organization
+```text
+Microsoft       → ORGANIZATION
+Microsoft 365   → PRODUCT
+Azure           → PRODUCT
+```
 
-"Microsoft" → ORG
+If the expression refers to the company itself, use ORGANIZATION.
 
-"Microsoft 365" → PRODUCT
-
-"Azure" → PRODUCT
-
-If the expression refers to the company itself, use ORG.
 If it refers to a named commercial product or service, use PRODUCT.
 
 ---
 
-## Location vs Organization
+## 5.2 Location vs Organization
 
-"United States" → LOCATION
+```text
+United States
+→ LOCATION
 
-"U.S. Securities and Exchange Commission" → ORG
+U.S. Securities and Exchange Commission
+→ ORGANIZATION
+```
 
-A geographic name is LOCATION unless it is part of a larger
-organization name.
-
----
-
-## Date vs Number
-
-"2021" → DATE when it represents a year.
-
-"2021 employees" → DATE for "2021" only if it clearly refers
-to a year; otherwise do not annotate it.
+A geographic name is LOCATION unless it is part of a larger organization name.
 
 ---
 
-## Money vs Number
+## 5.3 Date vs Number
 
-"$500 million" → MONEY
+```text
+2021
+```
 
-"500 million users" → no MONEY annotation.
+Annotate as DATE when it represents a year.
+
+If the number is used as a quantity rather than a year, it should not automatically be labeled DATE.
+
+For example:
+
+```text
+2021 employees
+```
+
+should not be labeled DATE merely because the number resembles a year.
+
+---
+
+## 5.4 Money vs Number
+
+```text
+$500 million → MONEY
+500 million users → no MONEY annotation
+```
 
 Only monetary quantities are MONEY.
 
@@ -353,15 +400,21 @@ Entity boundaries must be precise.
 
 Example:
 
-"The company generated $143 billion in revenue."
+```text
+The company generated $143 billion in revenue.
+```
 
 Correct:
 
+```text
 MONEY = "$143 billion"
+```
 
 Incorrect:
 
+```text
 MONEY = "$143 billion in revenue"
+```
 
 The entity should not include surrounding descriptive words.
 
@@ -369,27 +422,31 @@ The entity should not include surrounding descriptive words.
 
 # 7. Punctuation
 
-Include punctuation only when it is part of the entity expression.
+Include punctuation when it is part of the entity expression.
 
 Examples:
 
+```text
 "$339 million" → include "$"
-
 "36%" → include "%"
-
 "June 30, 2021" → include the complete date expression
+```
 
 Do not include surrounding sentence punctuation.
 
 Example:
 
-"Microsoft."
+```text
+Microsoft.
+```
 
 Correct:
 
-ORG = "Microsoft"
+```text
+ORGANIZATION = "Microsoft"
+```
 
-The period is not part of the entity.
+The final period is not part of the entity.
 
 ---
 
@@ -397,37 +454,41 @@ The period is not part of the entity.
 
 If an annotation is genuinely uncertain, do not invent a label.
 
-For the initial dataset, consistency is more important than
-aggressive annotation.
+For the initial dataset, consistency is more important than aggressive annotation.
 
-Uncertain examples should be recorded separately for later review.
+Uncertain cases should be recorded separately when possible so they can be reviewed during later annotation or dataset refinement.
 
 ---
 
 # 9. Quality Rules
 
-Every annotation should satisfy:
+Every annotation should satisfy the following:
 
-1. The entity belongs to one of the seven defined labels.
-2. The character offsets match the original text.
-3. The entity text exactly matches the selected span.
+1. The entity belongs to one of the defined labels.
+2. Character offsets match the original source text.
+3. Entity text exactly matches the selected span.
 4. Entity boundaries are precise.
-5. No overlapping entities exist.
+5. No overlapping entities are created.
 6. No unsupported labels are introduced.
+
+These rules provide the structural requirements later checked by dataset validation.
 
 ---
 
-# 10. Initial Entity Schema
+# 10. Initial Target Schema
 
-The initial schema is:
+The initial target schema is:
 
+```text
 PERSON
-ORG
+ORGANIZATION
 LOCATION
 DATE
 MONEY
-PERCENT
+PERCENTAGE
 PRODUCT
+```
 
-This schema may be expanded in later iterations based on
-error analysis and project requirements.
+The schema may be expanded or refined in later iterations based on project requirements, annotation review, and model error analysis.
+
+The schema defines the entity types that the project can represent; individual annotations determine which entity occurrences actually appear in a given document or dataset.

@@ -1,32 +1,12 @@
-# Intelligent Document Analysis
+# Intelligent Document Analysis — Phase 1 Technical Report
 
-A modular document processing pipeline for extracting, preprocessing, embedding, and storing heterogeneous documents for semantic retrieval.
+## 1. Overview
 
-> **Status:** **Phase 1 complete.** Document extraction, OCR fallback, text preprocessing, chunking, semantic embedding generation, ChromaDB storage, and semantic similarity search have been implemented and verified with unit and real-data integration tests.
+Phase 1 establishes the document-processing and semantic-retrieval foundation of the Intelligent Document Analysis system.
 
----
+The pipeline processes PDF and DOCX documents, extracts and normalizes their text, divides the content into overlapping chunks, generates semantic embeddings, stores the resulting vectors and metadata in ChromaDB, and performs semantic similarity search.
 
-# Overview
-
-This project implements the first stage of an intelligent document analysis system.
-
-The current implementation focuses on building a reliable document-to-vector pipeline:
-
-* Extract text from PDF and DOCX documents
-* Use OCR as a fallback for scanned PDFs
-* Clean and normalize extracted text
-* Split documents into overlapping chunks
-* Preserve document and page metadata
-* Generate semantic embeddings using Sentence Transformers
-* Store embeddings and metadata in ChromaDB
-* Perform semantic similarity search
-* Run the complete Phase 1 pipeline end-to-end
-
-The project is intentionally being developed incrementally. More advanced retrieval, document management, and RAG functionality will be considered after the core pipeline is complete.
-
----
-
-# Phase 1 Pipeline
+The main workflow is:
 
 ```text
 Raw Documents
@@ -37,9 +17,6 @@ Document Extraction
       ├── PDF
       ├── DOCX
       └── Scanned PDF → OCR
-      │
-      ▼
-Extracted Documents
       │
       ▼
 Text Preprocessing
@@ -57,100 +34,271 @@ ChromaDB
 Semantic Search
 ```
 
-The complete pipeline is implemented in:
+The executable entry point is:
 
 ```text
 pipelines/phase1.py
 ```
 
-Run it with:
+It can be run with:
 
 ```bash
 python -m pipelines.phase1
 ```
 
-The pipeline currently clears and recreates the configured ChromaDB collection before storing the newly processed documents. This keeps repeated development runs deterministic and avoids accumulating duplicate data during the current development stage.
+The pipeline recreates the configured ChromaDB collection before storing the newly processed documents. This keeps repeated development runs deterministic and prevents stale or duplicate data from accumulating.
 
 ---
 
-# Project Structure
+## 2. Document Ingestion
+
+Phase 1 supports:
+
+* PDF documents
+* DOCX documents
+* OCR fallback for scanned or image-based PDF pages
+
+The ingestion layer uses PyMuPDF for standard PDF text extraction. When a PDF page does not contain usable extractable text, OCR can be used as a fallback.
+
+DOCX documents are processed paragraph by paragraph and represented as page-like units for downstream processing.
+
+The extraction flow is:
 
 ```text
-intelligent-document-analysis/
-├── configs/
-│   └── config.yaml
-│
-├── docker/
-│   └── Dockerfile
-│
-├── reports/
-│   ├── phase1_report.md
-│   ├── phase2_report.md
-│   ├── phase3_report.md
-│   └── phase4_report.md
-│
-├── src/
-│   ├── config.py
-│   ├── schemas.py
-│   ├── types.py
-│   │
-│   ├── embeddings/
-│   │   └── embedding_pipeline.py
-│   │
-│   ├── extraction/
-│   │   ├── classifier.py
-│   │   └── ner_model.py
-│   │
-│   ├── ingestion/
-│   │   ├── docx_parser.py
-│   │   ├── extractor_manager.py
-│   │   ├── extractors.py
-│   │   ├── ocr_engine.py
-│   │   └── pdf_parser.py
-│   │
-│   ├── monitoring/
-│   │   └── metrics.py
-│   │
-│   ├── pipelines/
-│   │   └── phase1_pipeline.py
-│   │
-│   ├── preprocessing/
-│   │   ├── chunker.py
-│   │   ├── cleaner.py
-│   │   └── preprocessing_manager.py
-│   │
-│   ├── rag/
-│   │   ├── prompt_templates.py
-│   │   └── rag_chain.py
-│   │
-│   ├── utils/
-│   │   └── logger.py
-│   │
-│   └── vectorstore/
-│       └── chroma_store.py
-│
-├── tests/
-│   ├── integration/
-│   │   ├── test_ingestion_real_data.py
-│   │   └── test_vectorstore_real_data.py
-│   │
-│   └── unit/
-│       ├── test_embeddings.py
-│       ├── test_ingestion.py
-│       ├── test_preprocessing.py
-│       ├── test_rag_chain.py
-│       └── test_vectorstore.py
-│
-├── .env.example
-├── .gitignore
-├── README.md
-├── requirements.txt
-└── requirements-dev.txt
+PDF
+ │
+ ├── Usable text
+ │       ↓
+ │   PDF extraction
+ │
+ └── No usable text
+         ↓
+        OCR
 ```
+
+Unsupported file types are skipped and reported through the application logger rather than causing the complete pipeline to fail.
 
 ---
 
-# Tech Stack
+## 3. Text Preprocessing
+
+Extracted text is normalized before chunking and embedding.
+
+The preprocessing layer handles operations such as:
+
+* text normalization
+* whitespace normalization
+* line-ending normalization
+* removal of excessive blank lines
+* preservation of document and page metadata
+
+Preprocessing is separated from document extraction so that the individual stages can be tested and modified independently.
+
+---
+
+## 4. Chunking
+
+Documents are divided into overlapping chunks before embedding.
+
+The current configuration uses:
+
+```yaml
+chunking:
+  chunk_size: 1000
+  chunk_overlap: 200
+  max_length_preview: 200
+```
+
+The chunk size and overlap are configurable through the project configuration.
+
+The `max_length_preview` parameter controls only how much retrieved text is displayed in the Phase 1 demonstration output. It does not modify the stored chunk.
+
+Each chunk preserves metadata such as:
+
+```text
+chunk_id
+document_id
+page_start
+page_end
+section_title
+```
+
+This metadata is retained throughout the retrieval process so that search results can be traced back to their source documents and pages.
+
+---
+
+## 5. Embedding Generation
+
+Each processed chunk is converted into a dense semantic vector using Sentence Transformers.
+
+The embedding model is configurable through:
+
+```text
+configs/config.yaml
+```
+
+The embedding pipeline provides:
+
+* configurable embedding model
+* batch embedding
+* input validation
+* ChromaDB-compatible vector output
+
+The resulting vectors remain associated with their original chunks and metadata.
+
+---
+
+## 6. ChromaDB Vector Storage
+
+ChromaDB is used as the persistent local vector database.
+
+The vector-store layer is responsible for:
+
+* creating or opening the configured collection
+* storing embeddings
+* storing document and chunk metadata
+* performing semantic similarity search
+* counting stored chunks
+* deleting and recreating the collection when required
+
+The main vector-store location is:
+
+```text
+data/vectorstore/
+```
+
+The configured collection is:
+
+```text
+documents
+```
+
+Stored metadata includes:
+
+```text
+chunk_id
+document_id
+text
+page_start
+page_end
+section_title
+```
+
+This metadata allows retrieved chunks to retain their document and page context.
+
+---
+
+## 7. Semantic Search
+
+Phase 1 provides semantic retrieval over the stored document chunks.
+
+A query is first converted into an embedding using the same embedding model used for document chunks:
+
+```python
+query = "When he came to the war he was barely eighteen"
+
+query_embedding = embedding_pipeline.embed_texts(
+    [query]
+)[0]
+```
+
+The resulting vector is passed to ChromaDB:
+
+```python
+results = chroma_store.search(
+    query_embedding=query_embedding,
+    top_k=3,
+)
+```
+
+Search results contain the most semantically similar chunks together with their document and page metadata.
+
+A result is represented by information such as:
+
+```text
+SearchResultData(
+    chunk_id="59",
+    document_id="sample-text-pdf",
+    text="When he came to the war he was barely eighteen...",
+    page_start=19,
+    page_end=19,
+    distance=0.8499,
+    section_title=None,
+)
+```
+
+The retrieval distance is a vector-search distance and should not be interpreted as a correctness or confidence percentage.
+
+The complete chunk remains available to the retrieval system; only the demonstration output may be shortened using `max_length_preview`.
+
+---
+
+## 8. Phase 1 Pipeline
+
+The complete Phase 1 workflow is implemented in:
+
+```text
+pipelines/phase1.py
+```
+
+The pipeline performs:
+
+```text
+1. Extract documents
+2. Preprocess extracted text
+3. Create chunks
+4. Generate embeddings
+5. Recreate the ChromaDB collection
+6. Store chunks and embeddings
+7. Run an example semantic search
+8. Display retrieved results
+```
+
+The pipeline uses the same reusable components that are independently tested under `src/`.
+
+---
+
+## 9. Project Structure
+
+The Phase 1 implementation is organized into reusable components:
+
+```text
+src/
+├── config.py
+├── schemas.py
+├── types.py
+│
+├── embeddings/
+│   └── embedding_pipeline.py
+│
+├── ingestion/
+│   ├── docx_parser.py
+│   ├── extractor_manager.py
+│   ├── extractors.py
+│   ├── ocr_engine.py
+│   └── pdf_parser.py
+│
+├── preprocessing/
+│   ├── chunker.py
+│   ├── cleaner.py
+│   └── preprocessing_manager.py
+│
+└── vectorstore/
+    └── chroma_store.py
+```
+
+The main executable workflow is separated from these reusable components:
+
+```text
+pipelines/
+└── phase1.py
+```
+
+This separation allows individual processing stages to be tested independently while still supporting an end-to-end pipeline.
+
+---
+
+## 10. Technology Stack
 
 | Component        | Technology                      |
 | ---------------- | ------------------------------- |
@@ -167,7 +315,7 @@ intelligent-document-analysis/
 
 ---
 
-# Environment Setup
+## 11. Environment Setup
 
 Create a virtual environment:
 
@@ -182,7 +330,7 @@ Install project dependencies:
 pip install -r requirements.txt
 ```
 
-Install development/test dependencies:
+Install development and testing dependencies:
 
 ```bash
 pip install -r requirements-dev.txt
@@ -194,7 +342,7 @@ For OCR support on Ubuntu:
 sudo apt install tesseract-ocr
 ```
 
-Verify the installation:
+Verify the OCR installation:
 
 ```bash
 tesseract --version
@@ -202,250 +350,87 @@ tesseract --version
 
 ---
 
-# Document Ingestion
+## 12. Configuration
 
-Phase 1 currently supports:
-
-* PDF documents
-* DOCX documents
-* Scanned PDFs through OCR fallback
-
-The extraction manager processes all supported files from the configured input directory.
-
-For PDFs, the system first attempts normal text extraction. If no extractable text is found, it automatically falls back to OCR.
-
-Example processing flow:
+The main project configuration is stored in:
 
 ```text
-PDF
- │
- ├── Text available
- │       ↓
- │   PDF extraction
- │
- └── No text
-         ↓
-       OCR
+configs/config.yaml
 ```
 
-Unsupported file types are skipped and reported through the application logger.
+Relevant Phase 1 settings include:
 
----
+* input directories
+* embedding model
+* chunk size
+* chunk overlap
+* retrieval-result preview length
+* ChromaDB database path
+* ChromaDB collection name
 
-# Text Preprocessing and Chunking
-
-Extracted documents are cleaned before being divided into chunks.
-
-Current preprocessing includes:
-
-* Text normalization
-* Whitespace normalization
-* Line-ending normalization
-* Removal of excessive blank lines
-* Page-level text processing
-* Configurable chunk size
-* Configurable chunk overlap
-* Metadata preservation
-
-Current configuration:
+Current chunking configuration:
 
 ```yaml
 chunking:
-  chunk_size: 500
-  chunk_overlap: 50
+  chunk_size: 1000
+  chunk_overlap: 200
   max_length_preview: 200
 ```
 
-The `max_length_preview` value only controls how much retrieved text is displayed in the Phase 1 demonstration output. It does **not** change the stored chunk.
-
-Each chunk is represented by:
-
-```python
-Chunk(
-    chunk_id="153",
-    document_id="sample-ocr",
-    text="Invoice #12345. Total: $1,250.00",
-    page_start=1,
-    page_end=1,
-    section_title=None,
-)
-```
+Keeping these parameters in configuration allows the processing pipeline to be changed without modifying the implementation code.
 
 ---
 
-# Embedding Generation
+## 13. Testing
 
-Each chunk is converted into a dense semantic vector using Sentence Transformers.
+Phase 1 components are covered by both unit tests and real-data integration tests.
 
-The embedding model is configurable through the project configuration.
+### Unit Tests
 
-The resulting embeddings are passed directly to the vector database together with their corresponding chunks and metadata.
+Unit tests cover the main Phase 1 components, including:
 
-The embedding pipeline provides:
-
-* Configurable embedding model
-* Batch embedding
-* Input validation
-* ChromaDB-compatible vector output
-
----
-
-# ChromaDB Vector Storage
-
-Phase 1 uses ChromaDB as a persistent local vector database.
-
-The `ChromaStore` is responsible for:
-
-* Creating or opening the configured collection
-* Storing chunk embeddings
-* Storing document metadata
-* Performing semantic similarity search
-* Counting stored chunks
-* Deleting and recreating the collection
-
-Stored metadata includes:
-
-```text
-chunk_id
-document_id
-text
-page_start
-page_end
-section_title
-```
-
-Search results are represented as:
-
-```python
-SearchResultData(
-    chunk_id="59",
-    document_id="sample-text-pdf",
-    text="When he came to the war he was barely eighteen...",
-    page_start=19,
-    page_end=19,
-    distance=0.8499,
-    section_title=None,
-)
-```
-
----
-
-# Semantic Search
-
-The Phase 1 pipeline also demonstrates semantic retrieval.
-
-A query is converted into an embedding:
-
-```python
-query = "When he came to the war he was barely eighteen"
-
-query_embedding = embedding_pipeline.embed_texts(
-    [query]
-)[0]
-```
-
-The embedding is then passed to ChromaDB:
-
-```python
-results = chroma_store.search(
-    query_embedding=query_embedding,
-    top_k=3,
-)
-```
-
-The results contain the most semantically similar chunks together with their document and page metadata.
-
-Example:
-
-```text
-Search results:
-
-Result 1
-Document: sample-text-pdf
-Pages: 19-19
-Distance: 0.8499
-Text: mouth. When he came to the war he was barely eighteen...
-
-Result 2
-Document: sample-text-pdf
-Pages: 124-124
-Distance: 0.8612
-Text: ...he was nervous and high-strung, and only seventeen...
-
-Result 3
-Document: sample-text-pdf
-Pages: 67-67
-Distance: 0.9539
-Text: ...I should guess him to be thirty...
-```
-
-The complete chunk remains available to the retrieval system; only the demonstration output is shortened using `max_length_preview`.
-
----
-
-# Running Phase 1
-
-Run the complete Phase 1 pipeline:
-
-```bash
-python -m pipelines.phase1
-```
-
-The pipeline performs:
-
-```text
-1. Extract documents
-2. Preprocess extracted text
-3. Create chunks
-4. Generate embeddings
-5. Recreate the ChromaDB collection
-6. Store chunks and embeddings
-7. Run an example semantic search
-8. Display the retrieved results
-```
-
----
-
-# Testing
-
-Phase 1 has been verified using both **unit tests** and **real-data integration testing**.
-
-## Unit Tests
-
-Unit tests validate individual Phase 1 components independently, including:
-
-* Document ingestion
-* Text preprocessing
-* Embedding generation
+* document ingestion
+* text preprocessing
+* embedding generation
 * ChromaDB storage and retrieval
 
-Run the Phase 1 unit tests with the relevant unit-test files:
-
-```bash
-python -m pytest tests/unit/test_ingestion.py \
-tests/unit/test_preprocessing.py \
-tests/unit/test_embeddings.py \
-tests/unit/test_vectorstore.py -v
-```
-
-The RAG tests are intentionally not included here because RAG is outside the current Phase 1 scope.
-
-## Real-Data Integration Test
-
-The integration test uses the actual documents in `data/raw/` rather than artificial test dictionaries.
-
-Run:
-
-```bash
-python -m pytest tests/integration/test_vectorstore_real_data.py -v -s
-```
-
-The `-s` option is intentional because the test prints the retrieved results so semantic search can be inspected directly.
-
-The real-data test verifies the complete flow:
+Examples include:
 
 ```text
-Real documents
+tests/unit/test_ingestion.py
+tests/unit/test_preprocessing.py
+tests/unit/test_embeddings.py
+tests/unit/test_vectorstore.py
+```
+
+The complete repository test suite can be run with:
+
+```bash
+python -m pytest
+```
+
+At the current project state, the full suite contains:
+
+```text
+98 tests
+98 passed
+```
+
+### Real-Data Integration Testing
+
+Phase 1 also includes integration tests using actual project documents rather than only synthetic test data.
+
+Relevant tests include:
+
+```text
+tests/integration/test_ingestion_real_data.py
+tests/integration/test_vectorstore_real_data.py
+```
+
+These tests verify the interaction between the major components, including:
+
+```text
+Real Documents
       ↓
 Extraction
       ↓
@@ -457,169 +442,64 @@ Embedding
       ↓
 ChromaDB
       ↓
-Semantic search
+Semantic Search
       ↓
-Retrieved chunks
+Retrieved Chunks
 ```
+
+This provides verification beyond isolated unit tests and confirms that the processing and retrieval components work together on real document data.
 
 ---
 
-# Configuration
+## 14. Experimental Verification
 
-Project configuration is stored in:
+The final Phase 1 pipeline was executed against the project's document collection.
+
+The run successfully:
+
+* extracted supported documents;
+* used OCR fallback where required;
+* skipped unsupported `.doc` files;
+* skipped an unsupported `.txt` input;
+* generated 13,368 chunks;
+* populated the configured ChromaDB collection;
+* executed semantic retrieval successfully.
+
+The unsupported `.doc` files were:
 
 ```text
-configs/config.yaml
+data/raw/docx/2011 Annual Report.doc
+data/raw/docx/2019_Annual_Report.doc
 ```
 
-Relevant configuration includes:
-
-* Input directories
-* Embedding model
-* Chunk size
-* Chunk overlap
-* Search-result preview length
-* ChromaDB database path
-* ChromaDB collection name
-
-Example:
-
-```yaml
-chunking:
-  chunk_size: 500
-  chunk_overlap: 50
-  max_length_preview: 200
-```
-
----
-
-# Current Phase 1 Status
-
-| Component                  | Status |
-| -------------------------- | :----: |
-| Project Structure          |   ✅    |
-| PDF Extraction             |   ✅    |
-| DOCX Extraction            |   ✅    |
-| OCR Fallback               |   ✅    |
-| Text Cleaning              |   ✅    |
-| Text Chunking              |   ✅    |
-| Metadata Preservation      |   ✅    |
-| Embedding Pipeline         |   ✅    |
-| ChromaDB Storage           |   ✅    |
-| Semantic Search            |   ✅    |
-| Phase 1 Pipeline           |   ✅    |
-| Unit Tests                 |   ✅    |
-| Real-Data Integration Test |   ✅    |
-
----
-
-# Suggested Future Improvements
-
-The following ideas are intentionally **not part of the current Phase 1 implementation**. They are possible improvements identified during development.
-
-### Document Tracking and Reprocessing
-
-Currently, the Phase 1 pipeline recreates the ChromaDB collection before storing the processed data.
-
-Future versions could track which documents have already been processed and:
-
-* Skip documents that have not changed
-* Detect when a document has changed
-* Reprocess only affected documents
-* Replace the previous chunks belonging to a changed document
-
-### Stable Document and Chunk Identification
-
-Future versions could introduce more robust identifiers for documents and chunks.
-
-Possible approaches include:
-
-* File-based identifiers
-* Content hashes
-* Document fingerprints
-* Stable chunk identifiers
-
-This would make incremental processing and document replacement easier.
-
-### Duplicate Detection
-
-A future version could detect duplicate documents or duplicate content before storing them.
-
-Content-based hashing could be considered instead of relying only on filenames or paths.
-
-### Chunking Strategy Improvements
-
-The current implementation uses a fixed chunk size and overlap.
-
-Future improvements could investigate:
-
-* Semantic chunking
-* Structure-aware chunking
-* Paragraph-aware chunking
-* Header/section-aware chunking
-* Multiple chunk sizes for different retrieval requirements
-
-### Document Structure and Metadata
-
-Future versions could preserve richer document structure, such as:
-
-* Headers
-* Sections
-* Tables
-* Figures
-* Source file metadata
-* Document hierarchy
-
-### Advanced Retrieval
-
-Future retrieval improvements could include:
-
-* Metadata filtering
-* Hybrid search
-* Reranking
-* Query expansion
-* Retrieval evaluation metrics
-
-### RAG and LLM Integration
-
-A later stage can build on the retrieval layer to introduce:
+The unsupported text file was:
 
 ```text
-User Query
-    ↓
-Query Embedding
-    ↓
-Vector Search
-    ↓
-Relevant Chunks
-    ↓
-Context Construction
-    ↓
-LLM
-    ↓
-Generated Answer
+data/raw/unsupported.txt
 ```
 
-This is deliberately outside the current Phase 1 scope.
+These files were reported as skipped rather than treated as pipeline failures.
+
+The successful end-to-end run confirms that the Phase 1 processing, embedding, vector-storage, and retrieval stages operate together on the available project data.
 
 ---
 
-# Development Principles
+## 15. Engineering Principles
 
-The project follows several engineering principles:
+The Phase 1 implementation follows several engineering principles:
 
-* **Modularity** — each processing stage has a dedicated component.
-* **Separation of Concerns** — extraction, preprocessing, embedding, storage, and retrieval remain independent.
-* **Testability** — individual components are tested independently and the pipeline is also verified with real documents.
-* **Configurability** — important processing parameters are stored in YAML configuration.
-* **Incremental Development** — functionality is implemented and verified step-by-step.
-* **Avoid Premature Complexity** — advanced document tracking, deduplication, and RAG functionality are deferred until they are actually needed.
+* **Modularity** — individual processing stages have dedicated components.
+* **Separation of concerns** — extraction, preprocessing, embedding, storage, and retrieval remain distinct.
+* **Testability** — components are tested independently and through integration tests.
+* **Configurability** — important processing parameters are maintained in YAML configuration.
+* **Incremental development** — functionality is implemented and verified step by step.
+* **Controlled complexity** — more advanced functionality is introduced as separate stages rather than tightly coupling it to the document-processing foundation.
 
 ---
 
-# Phase 1 Summary
+## 16. Phase 1 Summary
 
-Phase 1 establishes the complete foundation for semantic document retrieval:
+Phase 1 establishes the document-processing and semantic-retrieval foundation used by the rest of the project:
 
 ```text
 Documents
@@ -637,12 +517,14 @@ ChromaDB
 Semantic Search
 ```
 
-The pipeline has been implemented, tested against real project documents, and verified end-to-end.
+The implementation supports PDF and DOCX ingestion, OCR fallback, configurable preprocessing and chunking, semantic embeddings, persistent vector storage, and semantic retrieval.
 
-The next development stage can build on this foundation without changing the basic Phase 1 architecture.
+The pipeline has been verified through unit tests, real-data integration tests, and an end-to-end execution against the project document collection.
+
+Later stages of the project build on this foundation for entity extraction and Retrieval-Augmented Generation.
 
 ---
 
-# License
+## 17. License
 
 This project is developed for educational and portfolio purposes.
